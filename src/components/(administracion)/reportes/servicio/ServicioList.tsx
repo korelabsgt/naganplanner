@@ -33,6 +33,7 @@ export default function ServicioList({ initialConfig }: Props) {
   const [ampm, setAmpm] = useState('PM');
   const [fechaBuscada, setFechaBuscada] = useState<string | null>(null);
   const [vistaActual, setVistaActual] = useState<'reporte' | 'ajustes' | 'impresion'>('reporte');
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   const { data: reporte, isLoading, isError } = useReporteServicio(fechaBuscada);
 
@@ -40,11 +41,13 @@ export default function ServicioList({ initialConfig }: Props) {
     if (!fecha) return;
     try {
       let h = parseInt(hora, 10);
-      if (ampm === 'PM' && h !== 12) h += 12;
-      if (ampm === 'AM' && h === 12) h = 0;
-      const hh = h.toString().padStart(2, '0');
-      const iso = `${fecha}T${hh}:${minuto}:00`;
-      const dateObj = new Date(iso);
+      if (h > 24) h = 24;
+      if (h <= 12) {
+        if (ampm === 'PM' && h !== 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+      }
+      const [y, m, d] = fecha.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d, h, parseInt(minuto, 10), 0);
       setFechaBuscada(dateObj.toISOString());
     } catch {
       // Fallback si falla el parseo
@@ -101,58 +104,89 @@ export default function ServicioList({ initialConfig }: Props) {
                   onChange={(e) => setFecha(e.target.value)}
                   className="flex-1 px-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-950 text-gray-800 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#F8AC32] transition-all"
                 />
-                <div className="flex items-center bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-700 rounded-xl px-3 focus-within:ring-2 focus-within:ring-[#F8AC32] transition-all shrink-0">
-                  <input
-                    type="text"
-                    value={hora}
-                    onFocus={(e) => e.target.select()}
-                    onClick={(e) => e.currentTarget.select()}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.length > 2) val = val.slice(-2);
-                      setHora(val);
-                    }}
-                    onBlur={() => {
-                      let h = parseInt(hora || '0', 10);
-                      if (h >= 12 && h < 24) {
-                        setAmpm('PM');
-                        if (h > 12) h -= 12;
-                      } else if (h === 24 || h === 0) {
-                        setAmpm('AM');
-                        h = 12;
-                      }
-                      setHora(h.toString().padStart(2, '0'));
-                    }}
-                    className="w-8 bg-transparent text-sm font-medium text-gray-800 dark:text-gray-100 outline-none text-center"
-                    placeholder="12"
-                  />
-                  <span className="text-gray-400 font-bold mx-1">:</span>
-                  <input
-                    type="text"
-                    value={minuto}
-                    onFocus={(e) => e.target.select()}
-                    onClick={(e) => e.currentTarget.select()}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.length > 2) val = val.slice(-2);
-                      setMinuto(val);
-                    }}
-                    onBlur={() => {
-                      let m = parseInt(minuto || '0', 10);
-                      if (m > 59) m = 59;
-                      setMinuto(m.toString().padStart(2, '0'));
-                    }}
-                    className="w-8 bg-transparent text-sm font-medium text-gray-800 dark:text-gray-100 outline-none text-center"
-                    placeholder="00"
-                  />
-                  <select
-                    value={ampm}
-                    onChange={(e) => setAmpm(e.target.value)}
-                    className="bg-transparent text-sm font-bold text-[#F8AC32] outline-none appearance-none cursor-pointer py-2.5 pl-2 text-center"
+                <div className="relative">
+                  <div 
+                    onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
+                    className="relative flex items-center bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-700 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#F8AC32] transition-all shrink-0 cursor-pointer hover:border-[#F8AC32]/50"
                   >
-                    <option value="AM" className="bg-white dark:bg-neutral-900 text-gray-900 dark:text-white">AM</option>
-                    <option value="PM" className="bg-white dark:bg-neutral-900 text-gray-900 dark:text-white">PM</option>
-                  </select>
+                    <div className="flex items-center pointer-events-none">
+                      <span className="w-5 text-center text-sm font-medium text-gray-800 dark:text-gray-100">{hora || '12'}</span>
+                      <span className="text-gray-400 font-bold mx-1">:</span>
+                      <span className="w-5 text-center text-sm font-medium text-gray-800 dark:text-gray-100">{minuto || '00'}</span>
+                      <span className="text-sm font-bold text-[#F8AC32] pl-2">{ampm}</span>
+                    </div>
+                  </div>
+
+                  {isTimePickerOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsTimePickerOpen(false)}></div>
+                      <div className="absolute top-full mt-2 right-0 sm:left-0 sm:right-auto bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl shadow-xl z-50 p-3 flex gap-3 min-w-[220px]">
+                        {/* Horas */}
+                        <div className="flex-1 flex flex-col items-center">
+                          <span className="text-[10px] font-bold text-gray-400 mb-2 tracking-wider">HORA</span>
+                          <div className="h-[180px] overflow-y-auto w-full flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'none' }}>
+                            {Array.from({length: 12}, (_, i) => i + 1).map(h => (
+                              <button 
+                                key={h}
+                                onClick={() => {
+                                  setHora(h.toString().padStart(2, '0'));
+                                }}
+                                className={`py-2 text-sm rounded-lg transition-colors ${hora === h.toString().padStart(2, '0') ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                              >
+                                {h.toString().padStart(2, '0')}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="w-[1px] bg-gray-100 dark:bg-neutral-800/60 my-2"></div>
+
+                        {/* Minutos */}
+                        <div className="flex-1 flex flex-col items-center">
+                          <span className="text-[10px] font-bold text-gray-400 mb-2 tracking-wider">MIN</span>
+                          <div className="h-[180px] overflow-y-auto w-full flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'none' }}>
+                            {Array.from({length: 60}, (_, i) => i).map(m => (
+                              <button 
+                                key={m}
+                                onClick={() => {
+                                  setMinuto(m.toString().padStart(2, '0'));
+                                }}
+                                className={`py-2 text-sm rounded-lg transition-colors ${minuto === m.toString().padStart(2, '0') ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                              >
+                                {m.toString().padStart(2, '0')}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="w-[1px] bg-gray-100 dark:bg-neutral-800/60 my-2"></div>
+
+                        {/* AM / PM */}
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <div className="w-full flex flex-col gap-2">
+                            <button 
+                              onClick={() => {
+                                setAmpm('AM');
+                                setIsTimePickerOpen(false);
+                              }}
+                              className={`py-3 text-sm rounded-lg transition-colors ${ampm === 'AM' ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                            >
+                              AM
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setAmpm('PM');
+                                setIsTimePickerOpen(false);
+                              }}
+                              className={`py-3 text-sm rounded-lg transition-colors ${ampm === 'PM' ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                            >
+                              PM
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <button

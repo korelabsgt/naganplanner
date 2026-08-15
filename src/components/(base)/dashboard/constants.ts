@@ -113,4 +113,14 @@ export const TODOS_LOS_MODULOS: Modulo[] = [
     subgrupo: 'Formación Espiritual',
     rolesPermitidos: 'TODOS',
   },
+  {
+    id: 'REPORTES',
+    titulo: 'Reportes',
+    descripcion: 'Centro de reportes y programas ministeriales.',
+    ruta: '/kore/reportes',
+    iconKey: 'tobsqthh',
+    categoria: 'Administración',
+    subgrupo: 'Organización Ministerial',
+    rolesPermitidos: 'TODOS',
+  },
 ];

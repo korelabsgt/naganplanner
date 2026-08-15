@@ -13,7 +13,7 @@ function calcularHoras(horaInicio: Date, minutosOffset: number): { inicio: strin
   const inicio = new Date(horaInicio.getTime() + minutosOffset * 60000);
   const fin = new Date(inicio.getTime());
   const fmt = (d: Date) =>
-    d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })
+    d.toLocaleTimeString('es-ES', { timeZone: 'America/Guatemala', hour: '2-digit', minute: '2-digit', hour12: true })
      .toUpperCase()
      .replace(/\./g, '')
      .replace(/ P M/g, ' PM')

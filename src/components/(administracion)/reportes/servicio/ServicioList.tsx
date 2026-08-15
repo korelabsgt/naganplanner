@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, FileText, Calendar, Clock, Eye, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { ConfigProgramaServicio } from './lib/zod';
 import { useReporteServicio } from './lib/hooks';
@@ -34,6 +34,10 @@ export default function ServicioList({ initialConfig }: Props) {
   const [fechaBuscada, setFechaBuscada] = useState<string | null>(null);
   const [vistaActual, setVistaActual] = useState<'reporte' | 'ajustes' | 'impresion'>('reporte');
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+
+  useEffect(() => {
+    // Ya no se requiere inicializar la fecha; usamos el truco de type="text"
+  }, []);
 
   const { data: reporte, isLoading, isError } = useReporteServicio(fechaBuscada);
 

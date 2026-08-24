@@ -95,6 +95,7 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
             min-height: 0 !important;
           }
           table { width: 100% !important; min-width: 100% !important; }
+          .overflow-x-auto { overflow: visible !important; }
         }
       `}</style>
 
@@ -129,12 +130,14 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
           </div>
         </div>
 
-        {/* Hoja de papel visual (A4) */}
-        <div
-          id="print-sheet"
-          className="bg-white w-full max-w-[816px] min-h-[1056px] shadow-xl rounded-xl p-8 sm:p-12 text-black mx-auto overflow-hidden relative"
-          style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
-        >
+        {/* Wrapper scrollable para móvil */}
+        <div className="w-full overflow-x-auto pb-8 custom-scrollbar">
+          {/* Hoja de papel visual (A4) con ancho fijo */}
+          <div
+            id="print-sheet"
+            className="w-[816px] shrink-0 min-h-[1056px] bg-white shadow-xl rounded-xl p-8 sm:p-12 text-black mx-auto relative"
+            style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+          >
           {/* Header */}
           <div className="flex flex-row items-start justify-between gap-4 border-b-2 border-[#F8AC32] pb-5 mb-6">
             <div>
@@ -212,6 +215,7 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
           <div className="absolute bottom-8 left-12 right-12 text-center text-[10px] text-gray-400 border-t border-gray-100 pt-4">
             Generado por Nagan Planner
           </div>
+        </div>
         </div>
       </div>
     </>

@@ -121,6 +121,6 @@ export const TODOS_LOS_MODULOS: Modulo[] = [
     iconKey: 'tobsqthh',
     categoria: 'Administración',
     subgrupo: 'Organización Ministerial',
-    rolesPermitidos: 'TODOS',
+    rolesPermitidos: ['admin', 'super'],
   },
 ];

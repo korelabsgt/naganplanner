@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   Edit2, Trash2, ChevronDown, Calendar, User, Users,
   Clock, AlertCircle, Ban, Mail, Paperclip, Youtube, X,
-  Star, Music, Copy
+  Star, Music, Copy, BookOpen
 } from 'lucide-react';
 import { Planificador, Perfil } from './lib/zod';
 import { usePlanificadorLogic, usePlanificadorMutations } from './lib/hooks';
@@ -14,6 +14,7 @@ import PlanificadorChecklist from './PlanificadorChecklist';
 import GestorArchivos from './modals/GestorArchivos';
 import GestorVideo from './modals/GestorVideo';
 import GestorDrive from './modals/GestorDrive';
+import GestorDones from './modals/GestorDones';
 import GestorAlabanzaActividad from './modals/GestorAlabanzaActividad';
 import ModalRepertorioActividad from './modals/ModalRepertorioActividad';
 import { obtenerRepertoriosDelMismoDia } from './lib/actions';
@@ -55,6 +56,7 @@ export default function PlanificadorItem({
   const [forceShowVideos, setForceShowVideos] = useState(false);
   const [forceShowDrive, setForceShowDrive] = useState(false);
   const [forceShowAlabanzas, setForceShowAlabanzas] = useState(false);
+  const [forceShowDones, setForceShowDones] = useState(false);
   const [modalRepertorioOpen, setModalRepertorioOpen] = useState(false);
 
   const [repertoriosHoy, setRepertoriosHoy] = useState<{ id: string, title: string, canciones_count: number }[]>([]);
@@ -116,7 +118,9 @@ export default function PlanificadorItem({
       case 'servicio_especial':
       case 'especial': return 'Servicio Especial';
       case 'reunion': return 'Reunión';
-      default: return status || 'General';
+      default: 
+        if (!status) return 'General';
+        return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
     }
   };
 
@@ -132,11 +136,13 @@ export default function PlanificadorItem({
   const videosSeguros = planificador.videos_url ?? [];
   const driveSeguros = planificador.archivos_drive ?? [];
   const alabanzasSeguras = (planificador as any).alabanzas ?? [];
+  const donesSeguros = (planificador as any).dones_espirituales ?? [];
 
   const showFiles = adjuntosSeguros.length > 0 || forceShowFiles;
   const showVideos = videosSeguros.length > 0 || forceShowVideos;
   const showDrive = driveSeguros.length > 0 || forceShowDrive;
   const showAlabanzas = alabanzasSeguras.length > 0 || forceShowAlabanzas;
+  const showDones = donesSeguros.length > 0 || forceShowDones;
 
   const handleBuscarRepertorios = async () => {
     setIsSearchingRepertorios(true);
@@ -287,7 +293,7 @@ export default function PlanificadorItem({
         `}>
           <div className="px-1 py-4 sm:px-5 sm:py-6 bg-gray-50/50 dark:bg-transparent flex flex-col gap-6">
 
-            <div className="flex flex-col gap-3 px-1.5 sm:px-0">
+            <div className="flex flex-col gap-3">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">{planificador.title}</h2>
 
               {planificador.due_date && (
@@ -312,8 +318,8 @@ export default function PlanificadorItem({
                 />
               )}
 
-              {puedeGestionarContenido && (!showFiles || !showVideos || !showDrive) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
+              {puedeGestionarContenido && (!showFiles || !showVideos || !showDrive || !showDones) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
                   {!showFiles && (
                     <button
                       onClick={() => setForceShowFiles(true)}
@@ -344,6 +350,17 @@ export default function PlanificadorItem({
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-green-500 transition-colors group-hover:scale-110"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                       <span className="text-sm font-bold text-gray-500 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400">
                         Vincular Drive
+                      </span>
+                    </button>
+                  )}
+                  {!showDones && (
+                    <button
+                      onClick={() => setForceShowDones(true)}
+                      className="group flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 hover:border-fuchsia-500 dark:hover:border-fuchsia-500 hover:bg-fuchsia-50/50 dark:hover:bg-fuchsia-900/10 transition-all duration-200 active:scale-95 hover:-translate-y-0.5 hover:shadow-sm"
+                    >
+                      <BookOpen size={18} className="text-gray-400 group-hover:text-fuchsia-500 transition-colors group-hover:scale-110" />
+                      <span className="text-sm font-bold text-gray-500 dark:text-gray-400 group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-400">
+                        Añadir Dones Espirituales
                       </span>
                     </button>
                   )}
@@ -522,6 +539,25 @@ export default function PlanificadorItem({
                   <GestorDrive
                     actividadId={planificador.id}
                     archivosIniciales={driveSeguros}
+                    readonly={!puedeGestionarContenido}
+                  />
+                </div>
+              )}
+
+              {showDones && (
+                <div className="relative mt-2 animate-in fade-in slide-in-from-top-2">
+                  {forceShowDones && donesSeguros.length === 0 && (
+                    <button
+                      onClick={() => setForceShowDones(false)}
+                      className="absolute top-2 right-0 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all z-10 active:scale-90"
+                      title="Cancelar dones espirituales"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  <GestorDones
+                    actividadId={planificador.id}
+                    donesIniciales={donesSeguros}
                     readonly={!puedeGestionarContenido}
                   />
                 </div>

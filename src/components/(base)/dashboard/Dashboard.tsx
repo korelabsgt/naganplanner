@@ -16,7 +16,7 @@ export function Dashboard({ isJefe = false }: DashboardProps) {
   const rol = (user?.user_metadata?.rol as Rol) ?? null;
 
   return (
-    <div className="space-y-12 px-6 max-w-7xl mx-auto py-10 relative">
+    <div className="space-y-12 px-2 sm:px-6 max-w-7xl mx-auto py-6 sm:py-10 relative">
       <ModulesView rol={rol} isJefe={isJefe} />
     </div>
   );

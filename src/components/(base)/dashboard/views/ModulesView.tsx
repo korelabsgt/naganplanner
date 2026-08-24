@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { TODOS_LOS_MODULOS, Rol, Modulo } from "../constants";
 import { ModuleCard } from "../modules/ModuleCard";
 import ModuleAccordion from "../modules/ModuleAccordion";
@@ -14,6 +15,17 @@ interface ModulesViewProps {
 
 export function ModulesView({ rol, isJefe = false }: ModulesViewProps) {
   const [loadingModule, setLoadingModule] = useState<string | null>(null);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const shouldHide = (group: string) => isMobile && expandedGroup && expandedGroup !== group;
   
   const user = useUser();
   const { profile } = useProfile(user?.id ?? "", !!user?.id);
@@ -63,69 +75,106 @@ export function ModulesView({ rol, isJefe = false }: ModulesViewProps) {
   const tieneDerecha = modulosPlanificacion.length > 0;
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4">
-      <div className={`grid grid-cols-1 ${tieneIzquierda && tieneDerecha ? "lg:grid-cols-2" : ""} gap-8 items-start`}>
+    <div className="w-full max-w-7xl mx-auto px-1 sm:px-4">
+      <div className={`grid grid-cols-1 ${tieneIzquierda && tieneDerecha ? "lg:grid-cols-2" : ""} gap-6 sm:gap-8 items-start`}>
         {/* Columna Izquierda: Organización y Formación */}
         {tieneIzquierda && (
           <div className="flex flex-col gap-6">
-            {/* Categoría: Organización Ministerial */}
-            {modulosMinisteriales.length > 0 && (
-              <ModuleAccordion
-                titulo="Organización Ministerial"
-                descripcion="Estructura organizacional y departamentos"
-                iconKey="unfvchvi"
-              >
-                {modulosMinisteriales.map((mod) => (
-                  <ModuleCard
-                    key={mod.id}
-                    modulo={mod}
-                    loadingModule={loadingModule}
-                    setLoadingModule={setLoadingModule}
-                  />
-                ))}
-              </ModuleAccordion>
-            )}
+            <AnimatePresence mode="popLayout">
+              {/* Categoría: Organización Ministerial */}
+              {modulosMinisteriales.length > 0 && (!shouldHide("Ministerial")) && (
+                <motion.div
+                  key="ministerial"
+                  layout
+                  initial={{ opacity: 0, scale: 0.95, height: 0 }}
+                  animate={{ opacity: 1, scale: 1, height: "auto" }}
+                  exit={{ opacity: 0, scale: 0.95, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
+                  <ModuleAccordion
+                    titulo="Organización Ministerial"
+                    descripcion="Estructura organizacional y departamentos"
+                    iconKey="unfvchvi"
+                    isOpen={expandedGroup === "Ministerial"}
+                    onToggle={() => setExpandedGroup(expandedGroup === "Ministerial" ? null : "Ministerial")}
+                  >
+                    {modulosMinisteriales.map((mod) => (
+                      <ModuleCard
+                        key={mod.id}
+                        modulo={mod}
+                        loadingModule={loadingModule}
+                        setLoadingModule={setLoadingModule}
+                      />
+                    ))}
+                  </ModuleAccordion>
+                </motion.div>
+              )}
 
-            {/* Categoría: Formación Espiritual */}
-            {modulosFormacion.length > 0 && (
-              <ModuleAccordion
-                titulo="Formación Espiritual"
-                descripcion="Escuelas de Aprendizaje Espiritual"
-                iconKey="freytsxj"
-              >
-                {modulosFormacion.map((mod) => (
-                  <ModuleCard
-                    key={mod.id}
-                    modulo={mod}
-                    loadingModule={loadingModule}
-                    setLoadingModule={setLoadingModule}
-                  />
-                ))}
-              </ModuleAccordion>
-            )}
+              {/* Categoría: Formación Espiritual */}
+              {modulosFormacion.length > 0 && (!shouldHide("Formacion")) && (
+                <motion.div
+                  key="formacion"
+                  layout
+                  initial={{ opacity: 0, scale: 0.95, height: 0 }}
+                  animate={{ opacity: 1, scale: 1, height: "auto" }}
+                  exit={{ opacity: 0, scale: 0.95, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
+                  <ModuleAccordion
+                    titulo="Formación Espiritual"
+                    descripcion="Escuelas de Aprendizaje Espiritual"
+                    iconKey="freytsxj"
+                    isOpen={expandedGroup === "Formacion"}
+                    onToggle={() => setExpandedGroup(expandedGroup === "Formacion" ? null : "Formacion")}
+                  >
+                    {modulosFormacion.map((mod) => (
+                      <ModuleCard
+                        key={mod.id}
+                        modulo={mod}
+                        loadingModule={loadingModule}
+                        setLoadingModule={setLoadingModule}
+                      />
+                    ))}
+                  </ModuleAccordion>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
         {/* Columna Derecha: Planificación de Servicio */}
         {tieneDerecha && (
           <div className="flex flex-col gap-6">
-            {/* Categoría: Planificación de Servicio */}
-            {modulosPlanificacion.length > 0 && (
-              <ModuleAccordion
-                titulo="Planificación de Servicio"
-                descripcion="Gestión de actividades y departamentos operativos"
-                iconKey="ctuxkbtj"
-              >
-                {modulosPlanificacion.map((mod) => (
-                  <ModuleCard
-                    key={mod.id}
-                    modulo={mod}
-                    loadingModule={loadingModule}
-                    setLoadingModule={setLoadingModule}
-                  />
-                ))}
-              </ModuleAccordion>
-            )}
+            <AnimatePresence mode="popLayout">
+              {/* Categoría: Planificación de Servicio */}
+              {modulosPlanificacion.length > 0 && (!shouldHide("Planificacion")) && (
+                <motion.div
+                  key="planificacion"
+                  layout
+                  initial={{ opacity: 0, scale: 0.95, height: 0 }}
+                  animate={{ opacity: 1, scale: 1, height: "auto" }}
+                  exit={{ opacity: 0, scale: 0.95, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
+                  <ModuleAccordion
+                    titulo="Planificación de Servicio"
+                    descripcion="Gestión de actividades y departamentos operativos"
+                    iconKey="ctuxkbtj"
+                    isOpen={expandedGroup === "Planificacion"}
+                    onToggle={() => setExpandedGroup(expandedGroup === "Planificacion" ? null : "Planificacion")}
+                  >
+                    {modulosPlanificacion.map((mod) => (
+                      <ModuleCard
+                        key={mod.id}
+                        modulo={mod}
+                        loadingModule={loadingModule}
+                        setLoadingModule={setLoadingModule}
+                      />
+                    ))}
+                  </ModuleAccordion>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>

@@ -123,7 +123,9 @@ export async function obtenerDatosPlanificador(
   const validActIds = actsFiltradas?.map(a => a.actividad_id) || [];
 
   if (validActIds.length === 0 && tipoVista !== 'todas') {
-    return { perfil: miPerfil, planificadores: [], usuarios: rawProfiles || [], departamentosEquipo, isJefe };
+    const { data: rawStatus } = await supabase.from('act_actividades').select('status');
+    const tiposServicio = Array.from(new Set((rawStatus || []).map(r => r.status).filter(Boolean)));
+    return { perfil: miPerfil, planificadores: [], usuarios: rawProfiles || [], departamentosEquipo, isJefe, tiposServicio };
   }
 
   let queryActs = supabase
@@ -143,7 +145,8 @@ export async function obtenerDatosPlanificador(
         alabanza_id,
         id_director,
         act_banco_alabanzas (*)
-      )
+      ),
+      act_dones_espirituales (*)
     `)
     .order('due_date', { ascending: true });
 
@@ -190,16 +193,21 @@ export async function obtenerDatosPlanificador(
       ...act,
       creator: { nombre: creador?.nombre || 'Desconocido' },
       integrantes: integrantesMapeados,
-      alabanzas: alabanzasMapeadas
+      alabanzas: alabanzasMapeadas,
+      dones_espirituales: act.act_dones_espirituales || []
     };
   });
+  // 5. Obtener los tipos de servicio únicos históricos
+  const { data: rawStatus } = await supabase.from('act_actividades').select('status');
+  const tiposServicio = Array.from(new Set((rawStatus || []).map(r => r.status).filter(Boolean)));
 
   return {
     perfil: miPerfil,
     planificadores,
     usuarios: (rawProfiles || []),
     departamentosEquipo,
-    isJefe
+    isJefe,
+    tiposServicio
   };
 }
 

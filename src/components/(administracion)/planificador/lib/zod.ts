@@ -27,10 +27,22 @@ export const driveSchema = z.object({
   url: z.string()
 });
 
+// --- Schema para Dones Espirituales ---
+export const donEspiritualSchema = z.object({
+  id: z.string().uuid(),
+  actividad_id: z.string().uuid(),
+  nombre_persona: z.string(),
+  palabras: z.string(),
+  citas_biblicas: z.string().nullable().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
+});
+
 export type ChecklistItem = z.infer<typeof checklistItemSchema>;
 export type Adjunto = z.infer<typeof adjuntoSchema>;
 export type VideoAdjunto = z.infer<typeof videoSchema>;
 export type ArchivoDrive = z.infer<typeof driveSchema>;
+export type DonEspiritual = z.infer<typeof donEspiritualSchema>;
 
 // 1. Schema para lectura de un Integrante
 export const integranteSchema = z.object({
@@ -76,6 +88,8 @@ export const planificadorSchema = z.object({
     tipo: z.string(),
     tonalidad: z.string().nullable().optional()
   })).nullable().optional().default([]),
+  
+  dones_espirituales: z.array(donEspiritualSchema).nullable().optional().default([]),
 
   creator: z.object({
     nombre: z.string()
@@ -97,9 +111,8 @@ export const planificadorFormSchema = z.object({
   description: z.string().optional(),
   due_date: z.string().refine((date) => date !== "", { message: "La fecha y hora son requeridas" }),
   
-  // --- CORRECCIÓN AQUÍ ---
   // Eliminamos el objeto de opciones { required_error... } porque .default() ya maneja el caso vacío.
-  status: z.enum(['servicio', 'ensayo', 'servicio_especial', 'reunion']).default('servicio'),
+  status: z.string().min(1, "El tipo de servicio es requerido").default('servicio'),
 
   modulo: z.string().optional(),
   checklist: z.array(checklistItemSchema).optional().default([]),

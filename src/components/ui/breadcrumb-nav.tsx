@@ -1,15 +1,18 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Home, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useUser } from "@/components/(base)/providers/UserProvider";
-import { useMemo } from "react";
+import { useMemo, Suspense } from "react";
 
-export function BreadcrumbNav() {
+function BreadcrumbNavContent() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
+
+  const from = searchParams.get("from");
 
   const user = useUser();
   const metadata = (user as any)?.raw_user_meta_data || user?.user_metadata || {};
@@ -19,7 +22,12 @@ export function BreadcrumbNav() {
   // Si estamos en el home, no renderizamos nada
   if (pathname === "/kore") return null;
 
-  const segments = pathname.split("/").filter((item) => item !== "");
+  let segments = pathname.split("/").filter((item) => item !== "");
+
+  // Si venimos del planificador a ver estadísticas, sobrescribimos los segmentos para que parezca que sigue ahí
+  if (from === "planificador" && pathname === "/kore/reportes/alabanzas") {
+    segments = ["kore", "planificador", "alabanza", "estadísticas"];
+  }
 
   // Calcular la ruta padre para el botón de atrás
   const parentPath = useMemo(() => {
@@ -113,7 +121,15 @@ export function BreadcrumbNav() {
           </AnimatePresence>
         </div>
       </motion.div>
-    </LayoutGroup>
+      </LayoutGroup>
     </div>
+  );
+}
+
+export function BreadcrumbNav() {
+  return (
+    <Suspense fallback={null}>
+      <BreadcrumbNavContent />
+    </Suspense>
   );
 }

@@ -27,7 +27,9 @@ import {
   obtenerRegistroSustituciones,
   sincronizarRepertorioActividad,
   marcarAsistenciaUbicacion,
-  clonarRepertorio
+  clonarRepertorio,
+  guardarDonEspiritual,
+  eliminarDonEspiritual
 } from "./actions";
 
 import {
@@ -160,6 +162,27 @@ export const usePlanificadorMutations = () => {
     onSuccess: invalidar,
   });
 
+  // --- Mutaciones de Dones Espirituales ---
+  const mutationAgregarDon = useMutation({
+    mutationFn: ({ id, don }: { id: string, don: Partial<DonEspiritual> }) => guardarDonEspiritual(id, don),
+    onSuccess: invalidar,
+  });
+
+  const mutationBorrarDon = useMutation({
+    mutationFn: ({ donId }: { donId: string }) => eliminarDonEspiritual(donId),
+    onSuccess: invalidar,
+  });
+
+  const mutationSincronizarRepertorio = useMutation({
+    mutationFn: ({ id, alabanzasIds }: { id: string, alabanzasIds: string[] }) => sincronizarRepertorioActividad(id, alabanzasIds),
+    onSuccess: invalidar,
+  });
+
+  const mutationImportarRepertorio = useMutation({
+    mutationFn: ({ origenId, destinoId }: { origenId: string, destinoId: string }) => clonarRepertorio(origenId, destinoId),
+    onSuccess: invalidar,
+  });
+
   return {
     guardar,
     eliminar,
@@ -174,15 +197,10 @@ export const usePlanificadorMutations = () => {
     agregarDrive: mutationAgregarDrive,
     borrarDrive: mutationBorrarDrive,
     marcarAsistencia,
-
-    sincronizarRepertorio: useMutation({
-      mutationFn: ({ id, alabanzasIds }: { id: string, alabanzasIds: string[] }) => sincronizarRepertorioActividad(id, alabanzasIds),
-      onSuccess: invalidar,
-    }),
-    importarRepertorio: useMutation({
-      mutationFn: ({ origenId, destinoId }: { origenId: string, destinoId: string }) => clonarRepertorio(origenId, destinoId),
-      onSuccess: invalidar,
-    }),
+    sincronizarRepertorio: mutationSincronizarRepertorio,
+    importarRepertorio: mutationImportarRepertorio,
+    agregarDon: mutationAgregarDon,
+    borrarDon: mutationBorrarDon,
     isLoading: guardar.isPending || eliminar.isPending || responderInvitacion.isPending ||
       darDeBaja.isPending || sustituirMiembro.isPending || updateChecklist.isPending ||
       mutationAgregarVideo.isPending || mutationAgregarAdjunto.isPending || mutationAgregarDrive.isPending

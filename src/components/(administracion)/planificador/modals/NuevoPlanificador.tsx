@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Save, Sparkles, Loader2, Trash2, Layers, Tag, Users, UserPlus, ClipboardList, Dices, Building2, Briefcase } from 'lucide-react';
+import { X, Save, Sparkles, Loader2, Trash2, Layers, Tag, Users, UserPlus, ClipboardList, Dices, Building2, Briefcase, Plus, ChevronDown } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { usePlanificadorMutations, useGestorEquipos } from '../lib/hooks';
 import { PlanificadorForm, planificadorFormSchema, Perfil, Planificador, ChecklistItem, VideoAdjunto } from '../lib/zod';
@@ -11,6 +11,7 @@ import { SeccionGeneral } from './SeccionGeneral';
 import { SeccionChecklist } from './SeccionChecklist';
 import { SeccionEquipo, IntegranteUI } from './SeccionEquipo';
 import GestorEquipos from './GestorEquipos';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const MODULOS_DISPONIBLES = [
   { value: 'alabanza', label: 'Alabanza' },
@@ -48,9 +49,10 @@ interface Props {
   modulo: 'alabanza' | 'danza' | 'danza-damas' | 'danza-caballeros' | 'multimedia' | 'todas' | string;
   tipoVista: 'mis_actividades' | 'mi_equipo' | 'todas';
   departamentosEquipo?: DeptoEquipo[];
+  tiposServicio?: string[];
 }
 
-export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioActualId, planificadorEditar, isJefe, modulo, tipoVista, departamentosEquipo = [] }: Props) {
+export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioActualId, planificadorEditar, isJefe, modulo, tipoVista, departamentosEquipo = [], tiposServicio = [] }: Props) {
   const { guardar, eliminar } = usePlanificadorMutations();
   const { cargarMiembros, plantillas } = useGestorEquipos();
 
@@ -60,15 +62,31 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
   const isReunionView = modulo === 'reunion';
   const isReunionMode = isAdminGlobalView || isReunionView;
 
-  const modulosVisibles = MODULOS_DISPONIBLES.filter(m => isReunionMode ? m.value === 'reunion' : m.value !== 'reunion');
-  const serviciosVisibles = TIPOS_SERVICIO.filter(t => isReunionMode ? (t.value === 'reunion' || t.value === 'ensayo') : t.value !== 'reunion');
+  const modulosVisibles = MODULOS_DISPONIBLES;
+
+  const allStatusOptions = useMemo(() => {
+    const base = [...TIPOS_SERVICIO];
+    tiposServicio.forEach(ts => {
+      if (!base.find(b => b.value.toLowerCase() === ts.toLowerCase())) {
+        const label = ts.charAt(0).toUpperCase() + ts.slice(1).toLowerCase();
+        base.push({ value: ts.toLowerCase(), label });
+      }
+    });
+    return base;
+  }, [tiposServicio]);
+
+  const serviciosVisibles = allStatusOptions.filter(t => t.value !== 'borrador');
 
   // --- ESTADOS ---
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [selectedModulo, setSelectedModulo] = useState<ModuloType>('alabanza');
-  const [selectedStatus, setSelectedStatus] = useState<StatusType>('servicio');
+  const [selectedStatus, setSelectedStatus] = useState<string>('servicio');
+  
+  const [customStatusInput, setCustomStatusInput] = useState('');
+  const [isStatusPopoverOpenDesktop, setIsStatusPopoverOpenDesktop] = useState(false);
+  const [isStatusPopoverOpenMobile, setIsStatusPopoverOpenMobile] = useState(false);
 
   const [modoAsignacion, setModoAsignacion] = useState<ModoAsignacion>('INDIVIDUAL');
   const [integrantes, setIntegrantes] = useState<IntegranteUI[]>([]);
@@ -183,8 +201,8 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
         setTitle(planificadorEditar.title);
         setDescription(planificadorEditar.description || '');
         setSelectedModulo((planificadorEditar.modulo as ModuloType) || 'alabanza');
-        const statusDB = planificadorEditar.status as StatusType;
-        setSelectedStatus(statusDB && ['servicio', 'ensayo', 'servicio_especial', 'reunion'].includes(statusDB) ? statusDB : 'servicio');
+        const statusDB = planificadorEditar.status;
+        setSelectedStatus(statusDB || 'servicio');
 
         if (planificadorEditar.due_date) {
           const d = new Date(planificadorEditar.due_date);
@@ -330,6 +348,77 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
     } catch (error: any) { }
   };
 
+  const renderStatusSelector = (isMobile: boolean = false) => {
+    const isOpen = isMobile ? isStatusPopoverOpenMobile : isStatusPopoverOpenDesktop;
+    const setIsOpen = isMobile ? setIsStatusPopoverOpenMobile : setIsStatusPopoverOpenDesktop;
+    
+    return (
+      <div className={`relative ${isMobile ? 'flex-1' : ''}`}>
+        <button
+          type="button"
+          disabled={guardar.isPending}
+          onClick={() => setIsOpen(!isOpen)}
+          className={`relative group h-9 flex items-center justify-center w-full gap-1.5 px-3 bg-gray-100 dark:bg-neutral-800 border border-transparent hover:border-gray-200 dark:hover:border-neutral-700 rounded-lg transition-all ${guardar.isPending ? 'opacity-50 cursor-not-allowed' : ''} ${isMobile ? '' : 'min-w-[120px]'}`}
+        >
+          <Tag size={isMobile ? 12 : 13} className="text-gray-400 shrink-0" />
+          <span className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 truncate`}>
+            {serviciosVisibles.find(t => t.value === selectedStatus)?.label || selectedStatus}
+          </span>
+          <ChevronDown size={14} className="text-gray-400 shrink-0 ml-1 opacity-50 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            <div className="absolute top-full left-0 mt-2 w-56 p-2 bg-white dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 origin-top-left">
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto custom-scrollbar">
+                {serviciosVisibles.map(t => (
+                  <button
+                    key={t.value}
+                    onClick={() => { setSelectedStatus(t.value); setIsOpen(false); }}
+                    className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedStatus === t.value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold' : 'hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Nuevo tipo..."
+                  value={customStatusInput}
+                  onChange={(e) => setCustomStatusInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && customStatusInput.trim()) {
+                      e.preventDefault();
+                      setSelectedStatus(customStatusInput.trim().toLowerCase());
+                      setCustomStatusInput('');
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="flex-1 w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-neutral-800 rounded-md px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-900 dark:text-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customStatusInput.trim()) {
+                      setSelectedStatus(customStatusInput.trim().toLowerCase());
+                      setCustomStatusInput('');
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-md transition-colors"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -358,17 +447,7 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
 
               {!isReunionMode ? (
                 <div className="hidden sm:flex items-center gap-2 shrink-0">
-                  <div className="relative group h-9 min-w-[120px]">
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 px-3 bg-gray-100 dark:bg-neutral-800 border border-transparent group-hover:border-gray-200 dark:group-hover:border-neutral-700 rounded-lg pointer-events-none transition-all">
-                      <Tag size={13} className="text-gray-400 shrink-0" />
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 truncate">
-                        {serviciosVisibles.find(t => t.value === selectedStatus)?.label || selectedStatus}
-                      </span>
-                    </div>
-                    <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as StatusType)} disabled={guardar.isPending} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed">
-                      {serviciosVisibles.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
+                  {renderStatusSelector(false)}
                   <div className="relative group h-9 min-w-[120px]">
                     <div className="absolute inset-0 flex items-center justify-center gap-2 px-3 bg-gray-100 dark:bg-neutral-800 border border-transparent group-hover:border-gray-200 dark:group-hover:border-neutral-700 rounded-lg pointer-events-none transition-all">
                       <Layers size={13} className="text-gray-400 shrink-0" />
@@ -376,38 +455,24 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
                         {modulosVisibles.find(m => m.value === selectedModulo)?.label || selectedModulo}
                       </span>
                     </div>
-                    <select value={selectedModulo} onChange={(e) => setSelectedModulo(e.target.value as ModuloType)} disabled={!!isModuloLocked || guardar.isPending} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed">
-                      {modulosVisibles.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    <select value={selectedModulo} onChange={(e) => setSelectedModulo(e.target.value as ModuloType)} disabled={!!isModuloLocked || guardar.isPending} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100">
+                      {modulosVisibles.map(m => <option className="bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100" key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                   </div>
                 </div>
               ) : (
-                <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg shrink-0">
-                  <Tag size={13} className="text-blue-500" />
-                  <span className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400">Reunión / Evento</span>
+                <div className="hidden sm:flex items-center gap-2 shrink-0">
+                  {renderStatusSelector(false)}
                 </div>
               )}
             </div>
 
             <div className="flex sm:hidden items-center gap-2 w-full">
               {isReunionMode ? (
-                <div className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg w-full">
-                  <Tag size={13} className="text-blue-500" />
-                  <span className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400">Reunión / Evento</span>
-                </div>
+                renderStatusSelector(true)
               ) : (
                 <>
-                  <div className="relative group h-9 flex-1">
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 px-3 bg-gray-100 dark:bg-neutral-800 border border-transparent rounded-lg pointer-events-none">
-                      <Tag size={13} className="text-gray-400 shrink-0" />
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 truncate">
-                        {serviciosVisibles.find(t => t.value === selectedStatus)?.label || selectedStatus}
-                      </span>
-                    </div>
-                    <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as StatusType)} disabled={guardar.isPending} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed">
-                      {serviciosVisibles.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
+                  {renderStatusSelector(true)}
                   <div className="relative group h-9 flex-1">
                     <div className="absolute inset-0 flex items-center justify-center gap-2 px-3 bg-gray-100 dark:bg-neutral-800 border border-transparent rounded-lg pointer-events-none">
                       <Layers size={13} className="text-gray-400 shrink-0" />
@@ -415,8 +480,8 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
                         {modulosVisibles.find(m => m.value === selectedModulo)?.label || selectedModulo}
                       </span>
                     </div>
-                    <select value={selectedModulo} onChange={(e) => setSelectedModulo(e.target.value as ModuloType)} disabled={!!isModuloLocked || guardar.isPending} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed">
-                      {modulosVisibles.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    <select value={selectedModulo} onChange={(e) => setSelectedModulo(e.target.value as ModuloType)} disabled={!!isModuloLocked || guardar.isPending} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100">
+                      {modulosVisibles.map(m => <option className="bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100" key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                   </div>
                 </>

@@ -31,7 +31,8 @@ export default async function GestorPlanificador({ tipoVista, modulo }: Props) {
           usuarios: datos.usuarios,
           perfil: datos.perfil,
           departamentosEquipo: datos.departamentosEquipo, 
-          isJefe: datos.isJefe
+          isJefe: datos.isJefe,
+          tiposServicio: datos.tiposServicio || []
         }} 
         tipoVista={tipoVista}
         modulo={modulo} // <--- Pasamos el prop al componente cliente

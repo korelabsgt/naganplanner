@@ -11,6 +11,8 @@ interface ModuleAccordionProps {
   iconKey?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
 export default function ModuleAccordion({
@@ -19,13 +21,27 @@ export default function ModuleAccordion({
   iconKey,
   children,
   defaultOpen = false,
+  isOpen: controlledIsOpen,
+  onToggle,
 }: ModuleAccordionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
+
+  const isControlled = controlledIsOpen !== undefined;
+  const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle();
+    }
+    if (!isControlled) {
+      setInternalIsOpen(!internalIsOpen);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className="flex items-center justify-between w-full px-6 py-5 text-left group transition-all bg-card/40 hover:bg-card/60 border border-border/40 rounded-2xl shadow-sm"
       >
         <div className="flex items-center gap-5">
@@ -63,7 +79,7 @@ export default function ModuleAccordion({
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-1 gap-3 pb-4 px-1">
+            <div className="grid grid-cols-1 gap-3 pb-4 px-4 sm:px-6 mx-auto w-[98%] sm:w-[96%]">
               {children}
             </div>
           </motion.div>

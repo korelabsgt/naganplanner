@@ -3,8 +3,9 @@
 import { useState, useMemo } from 'react';
 import {
   Plus, Search, Calendar as CalendarIcon,
-  SearchX, LayoutGrid, ArrowLeft, Building2, ChevronDown, ChevronRight, Users, Filter, ClipboardList, Music
+  SearchX, LayoutGrid, ArrowLeft, Building2, ChevronDown, ChevronRight, Users, Filter, ClipboardList, Music, BarChart
 } from 'lucide-react';
+import Link from 'next/link';
 import { Planificador, Perfil } from './lib/zod';
 import { useGestorPlanificador } from './lib/hooks';
 import PlanificadorItem from './PlanificadorItem';
@@ -27,6 +28,7 @@ interface Props {
     perfil: Perfil;
     departamentosEquipo?: DeptoEquipo[];
     isJefe?: boolean;
+    tiposServicio?: string[];
   };
   tipoVista: 'mis_actividades' | 'mi_equipo' | 'todas';
   modulo: 'alabanza' | 'danza' | 'danza-damas' | 'danza-caballeros' | 'multimedia' | 'todas' | 'reunion' | string;
@@ -201,7 +203,11 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
       map[fechaKey].push(plan);
     });
 
-    const grupos = Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+    const isProximos = filtroEstado === 'Próximos';
+    
+    const grupos = Object.entries(map).sort((a, b) => {
+      return isProximos ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]);
+    });
 
     if (grupos.length === 0) {
       return (
@@ -229,7 +235,7 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
                 .sort((a, b) => {
                   const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
                   const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
-                  return dateB - dateA;
+                  return isProximos ? dateA - dateB : dateB - dateA;
                 })
                 .map((plan) => (
                 <PlanificadorItem
@@ -369,6 +375,17 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
                   </button>
                 )}
 
+                {/* BOTÓN ESTADÍSTICAS ALABANZAS - Solo para SUPER, ADMIN, LIDERES en el módulo de alabanza */}
+                {modulo === 'alabanza' && (isJefe || ['super', 'admin', 'lider'].includes(perfil?.rol?.toLowerCase() || '')) && (
+                  <Link
+                    href="/kore/reportes/alabanzas?from=planificador"
+                    className="bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 p-3 rounded-2xl transition-colors border border-sky-100 dark:border-sky-800 shrink-0"
+                    title="Estadísticas de Alabanzas"
+                  >
+                    <BarChart size={20} />
+                  </Link>
+                )}
+
                 {/* BOTÓN GESTOR DE EQUIPOS */}
                 <button
                   onClick={() => setIsGestorEquiposOpen(true)}
@@ -380,9 +397,9 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
 
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="flex-1 md:flex-none bg-[#d6a738] hover:bg-[#c08e2a] text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-[#d6a738]/20 dark:shadow-none transition-all flex items-center justify-center gap-2 active:scale-95 text-sm"
+                  className="flex-1 md:flex-none bg-[#d6a738] hover:bg-[#c08e2a] text-white px-4 sm:px-6 py-3 rounded-2xl font-bold shadow-lg shadow-[#d6a738]/20 dark:shadow-none transition-all flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 text-[13px] sm:text-sm whitespace-nowrap"
                 >
-                  <Plus size={18} /> Nueva Actividad
+                  <Plus size={18} className="hidden sm:block shrink-0" /> Nueva Actividad
                 </button>
               </div>
             )}
@@ -450,7 +467,18 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
                   onChange={e => setFiltroTipo(e.target.value)}
                   className="w-full pl-9 pr-8 py-2.5 bg-[#faf8f4] dark:bg-neutral-800 rounded-2xl text-sm font-bold text-[#4a3f36] dark:text-[#f4ebc3] outline-none cursor-pointer border-r-8 border-r-transparent focus:ring-2 focus:ring-[#d6a738]/20 appearance-none"
                 >
-                  {TIPOS_SERVICIO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {(() => {
+                    const base = [...TIPOS_SERVICIO];
+                    if (data?.tiposServicio) {
+                      data.tiposServicio.forEach((ts: string) => {
+                        if (ts.toLowerCase() !== 'borrador' && !base.find(b => b.value.toLowerCase() === ts.toLowerCase())) {
+                          const label = ts.charAt(0).toUpperCase() + ts.slice(1).toLowerCase();
+                          base.push({ value: ts.toLowerCase(), label });
+                        }
+                      });
+                    }
+                    return base.map(t => <option key={t.value} value={t.value}>{t.label}</option>);
+                  })()}
                 </select>
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#9c8e7c]">
                   <ChevronDown size={14} />
@@ -559,6 +587,7 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
         modulo={modulo}
         tipoVista={tipoVista}
         departamentosEquipo={departamentosEquipo}
+        tiposServicio={data?.tiposServicio || []}
       />
 
       {/* MODAL DE GESTIÓN (CRUD de equipos) */}

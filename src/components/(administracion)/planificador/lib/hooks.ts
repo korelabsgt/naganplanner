@@ -38,7 +38,8 @@ import {
   Perfil,
   VideoAdjunto,
   Adjunto,
-  EquipoPlantilla
+  EquipoPlantilla,
+  DonEspiritual
 } from "./zod";
 
 const CACHE_TIME = 1000 * 60 * 6;

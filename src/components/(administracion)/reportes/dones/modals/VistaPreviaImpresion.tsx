@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Printer, Download, Loader2 } from 'lucide-react';
 import { DonReporte } from '../Lib/zod';
+import { useAjustesGlobales } from '../../servicio/lib/hooks';
 
 interface Props {
   dones: DonReporte[];
@@ -33,6 +34,7 @@ const formatFechaPdf = (iso: string | null) => {
 
 export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Props) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const { data: ajustes } = useAjustesGlobales();
 
   const handleImprimir = () => {
     window.print();
@@ -49,6 +51,7 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
         <ReporteDonesPDF
           dones={dones}
           mesFiltro={mesFiltro}
+          nombreIglesia={ajustes?.nombre_iglesia}
         />
       ).toBlob();
 
@@ -66,6 +69,7 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
     <>
       <style>{`
         @media print {
+          @page { size: legal landscape; margin: 10mm; }
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -99,10 +103,10 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
         }
       `}</style>
 
-      <div id="print-root" className="p-4 sm:p-6 lg:p-8 flex-1 overflow-y-auto bg-gray-100 dark:bg-neutral-900 flex flex-col items-center min-h-screen">
+      <div id="print-root" className="p-4 sm:p-6 lg:p-8 print:p-0 print:block flex-1 overflow-y-auto print:overflow-visible bg-gray-100 dark:bg-neutral-900 flex flex-col items-center min-h-screen">
 
         {/* Controles superiores */}
-        <div id="print-overlay-controls" className="w-full max-w-[816px] flex justify-between items-center mb-6 print:hidden">
+        <div id="print-overlay-controls" className="w-full max-w-[1344px] flex justify-between items-center mb-6 print:hidden">
           <button
             onClick={onClose}
             className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
@@ -131,11 +135,11 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
         </div>
 
         {/* Wrapper scrollable para móvil */}
-        <div className="w-full overflow-x-auto pb-8 custom-scrollbar">
-          {/* Hoja de papel visual (A4) con ancho fijo */}
+        <div className="w-full overflow-x-auto pb-8 custom-scrollbar print:overflow-visible print:w-full print:pb-0">
+          {/* Hoja de papel visual (Oficio Horizontal) con ancho fijo */}
           <div
             id="print-sheet"
-            className="w-[816px] shrink-0 min-h-[1056px] bg-white shadow-xl rounded-xl p-8 sm:p-12 text-black mx-auto relative"
+            className="w-[1344px] print:w-full print:max-w-full print:min-w-0 print:shrink print:shadow-none print:rounded-none print:min-h-0 print:p-0 print:m-0 shrink-0 min-h-[816px] bg-white shadow-xl rounded-xl p-8 sm:p-12 text-black mx-auto relative"
             style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
           >
           {/* Header */}
@@ -161,16 +165,25 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
             </div>
           </div>
 
+          {/* Nombre de la iglesia centrado */}
+          {ajustes?.nombre_iglesia && (
+            <div className="text-center mb-5">
+              <h2 className="text-xl font-bold text-gray-800 uppercase tracking-widest">
+                {ajustes.nombre_iglesia}
+              </h2>
+            </div>
+          )}
+
           {/* Tabla de contenido */}
           <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
             <table className="w-full table-fixed text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-[#F8AC32] text-white">
-                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[5%]">No.</th>
-                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[12%]">Fecha</th>
-                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[28%]">Nombre</th>
-                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[40%]">Palabras</th>
-                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[15%]">Citas</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[4%]">No.</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[10%]">Fecha</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[20%]">Nombre</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[30%]">Palabras</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-white uppercase tracking-wider text-center w-[36%]">Citas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -202,7 +215,7 @@ export default function VistaPreviaImpresion({ dones, mesFiltro, onClose }: Prop
                         ))}
                       </td>
                       <td className="py-3 px-3 text-gray-700 align-middle leading-relaxed whitespace-pre-wrap text-justify">{don.palabras}</td>
-                      <td className="py-3 px-3 text-gray-500 align-middle text-xs text-center">{don.citas_biblicas || <span className="italic opacity-50">Sin citas</span>}</td>
+                      <td className="py-3 px-3 text-gray-500 align-middle text-xs text-justify leading-relaxed">{don.citas_biblicas || <span className="italic opacity-50">Sin citas</span>}</td>
                     </tr>
                   );
                 })

@@ -144,9 +144,11 @@ export async function obtenerDatosPlanificador(
       act_actividades_alabanzas (
         alabanza_id,
         id_director,
+        observaciones,
         act_banco_alabanzas (*)
       ),
-      act_dones_espirituales (*)
+      act_dones_espirituales (*),
+      act_acuerdos_reunion (*)
     `)
     .order('due_date', { ascending: true });
 
@@ -185,16 +187,18 @@ export async function obtenerDatosPlanificador(
       return {
         ...dbSong,
         director_id: rel.id_director,
-        director_nombre: directorPerfil?.nombre || null
+        director_nombre: directorPerfil?.nombre || null,
+        observaciones: rel.observaciones || dbSong.observaciones || null
       };
-    });
+    }).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre));
 
     return {
       ...act,
       creator: { nombre: creador?.nombre || 'Desconocido' },
       integrantes: integrantesMapeados,
       alabanzas: alabanzasMapeadas,
-      dones_espirituales: act.act_dones_espirituales || []
+      dones_espirituales: (act.act_dones_espirituales || []).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+      notas_reunion: (act.act_acuerdos_reunion || []).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     };
   });
   // 5. Obtener los tipos de servicio únicos históricos
@@ -298,6 +302,61 @@ export async function guardarPlanificador(data: PlanificadorForm, idEdicion?: st
 
     if (errorInsert) throw new Error(errorInsert.message);
     actividadId = nuevaActividad.id;
+
+    if (parsed.data.origen_id_para_duplicar) {
+      // 1. Copiar Notas (Acuerdos)
+      const { data: notasOrigen } = await supabase.from('act_acuerdos_reunion').select('*').eq('actividad_id', parsed.data.origen_id_para_duplicar);
+      if (notasOrigen && notasOrigen.length > 0) {
+        const notasParaInsertar = notasOrigen
+          .filter(n => n.estado !== 'completado')
+          .map(n => ({
+            actividad_id: actividadId,
+            nota: n.nota,
+            descripcion: n.descripcion,
+            estado: 'pendiente', // ¡Reiniciar el estado por si acaso!
+            responsable_id: n.responsable_id
+          }));
+        if (notasParaInsertar.length > 0) {
+          await supabase.from('act_acuerdos_reunion').insert(notasParaInsertar);
+        }
+      }
+
+      // 2. Copiar Dones Espirituales
+      const { data: donesOrigen } = await supabase.from('act_dones_espirituales').select('*').eq('actividad_id', parsed.data.origen_id_para_duplicar);
+      if (donesOrigen && donesOrigen.length > 0) {
+        const donesParaInsertar = donesOrigen.map(d => ({
+          actividad_id: actividadId,
+          nombre_persona: d.nombre_persona,
+          palabras: d.palabras,
+          citas_biblicas: d.citas_biblicas
+        }));
+        await supabase.from('act_dones_espirituales').insert(donesParaInsertar);
+      }
+
+      // 3. Copiar Alabanzas (Repertorio)
+      const { data: alabanzasOrigen } = await supabase.from('act_actividades_alabanzas').select('*').eq('actividad_id', parsed.data.origen_id_para_duplicar);
+      if (alabanzasOrigen && alabanzasOrigen.length > 0) {
+        const alabanzasParaInsertar = alabanzasOrigen.map(a => ({
+          actividad_id: actividadId,
+          alabanza_id: a.alabanza_id,
+          id_director: a.id_director,
+          observaciones: a.observaciones
+        }));
+        await supabase.from('act_actividades_alabanzas').insert(alabanzasParaInsertar);
+      }
+
+      // 4. Copiar Archivos Adjuntos (PDFs)
+      const { data: adjuntosOrigen } = await supabase.from('act_adjuntos').select('*').eq('actividad_id', parsed.data.origen_id_para_duplicar);
+      if (adjuntosOrigen && adjuntosOrigen.length > 0) {
+        const adjuntosParaInsertar = adjuntosOrigen.map(a => ({
+          actividad_id: actividadId,
+          nombre: a.nombre,
+          url: a.url,
+          tipo: a.tipo
+        }));
+        await supabase.from('act_adjuntos').insert(adjuntosParaInsertar);
+      }
+    }
   }
 
   if (actividadId && parsed.data.integrantes.length > 0) {

@@ -141,7 +141,20 @@ export async function sincronizarRepertorioActividad(actividad_id: string, alaba
     throw new Error('No tienes permisos suficientes para modificar el repertorio.');
   }
 
-  // 1. Eliminar todo el repertorio anterior de esta actividad
+  // 1. Obtener el repertorio actual para preservar directores y observaciones
+  const { data: repertorioActual } = await supabase
+    .from('act_actividades_alabanzas')
+    .select('alabanza_id, id_director, observaciones')
+    .eq('actividad_id', actividad_id);
+
+  const mapaRepertorioAnterior = new Map();
+  if (repertorioActual) {
+    repertorioActual.forEach(item => {
+      mapaRepertorioAnterior.set(item.alabanza_id, item);
+    });
+  }
+
+  // 2. Eliminar todo el repertorio anterior de esta actividad
   const { error: deleteError } = await supabase
     .from('act_actividades_alabanzas')
     .delete()
@@ -149,12 +162,17 @@ export async function sincronizarRepertorioActividad(actividad_id: string, alaba
 
   if (deleteError) throw new Error(deleteError.message);
 
-  // 2. Insertar el nuevo repertorio (si hay)
+  // 3. Insertar el nuevo repertorio (si hay)
   if (alabanzas_ids.length > 0) {
-    const payload = alabanzas_ids.map(id => ({
-      actividad_id,
-      alabanza_id: id
-    }));
+    const payload = alabanzas_ids.map(id => {
+      const previo = mapaRepertorioAnterior.get(id);
+      return {
+        actividad_id,
+        alabanza_id: id,
+        id_director: previo ? previo.id_director : null,
+        observaciones: previo ? previo.observaciones : null
+      };
+    });
 
     const { error: insertError } = await supabase
       .from('act_actividades_alabanzas')
@@ -267,6 +285,44 @@ export async function asignarDirectorCanto(actividad_id: string, alabanza_id: st
   revalidatePath('/kore/planificador');
 }
 
+export async function actualizarObservacionCantoActividad(actividad_id: string, alabanza_id: string, observaciones: string | null) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+
+  const { error } = await supabase
+    .from('act_actividades_alabanzas')
+    .update({ observaciones })
+    .eq('actividad_id', actividad_id)
+    .eq('alabanza_id', alabanza_id);
+
+  if (error) {
+    console.error("Error actualizando observaciones:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/kore/planificador');
+}
+
+export async function sustituirCantoActividad(actividad_id: string, alabanza_vieja_id: string, alabanza_nueva_id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+
+  const { error } = await supabase
+    .from('act_actividades_alabanzas')
+    .update({ alabanza_id: alabanza_nueva_id })
+    .eq('actividad_id', actividad_id)
+    .eq('alabanza_id', alabanza_vieja_id);
+
+  if (error) {
+    console.error("Error sustituyendo canto:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/kore/planificador');
+}
+
 export async function obtenerRepertoriosDelMismoDia(actividad_id: string) {
   const supabase = await createClient();
 
@@ -316,7 +372,7 @@ export async function clonarRepertorio(origen_id: string, destino_id: string) {
   // 1. Obtener las canciones de la actividad origen
   const { data: cancionesOrigen, error: fetchError } = await supabase
     .from('act_actividades_alabanzas')
-    .select('alabanza_id, id_director')
+    .select('alabanza_id, id_director, observaciones')
     .eq('actividad_id', origen_id);
 
   if (fetchError || !cancionesOrigen) throw new Error("No se pudo obtener el repertorio origen");
@@ -332,7 +388,8 @@ export async function clonarRepertorio(origen_id: string, destino_id: string) {
     const payload = cancionesOrigen.map(c => ({
       actividad_id: destino_id,
       alabanza_id: c.alabanza_id,
-      id_director: c.id_director
+      id_director: c.id_director,
+      observaciones: c.observaciones
     }));
 
     const { error: insertError } = await supabase

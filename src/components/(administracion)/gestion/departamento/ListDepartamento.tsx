@@ -435,8 +435,8 @@ export default function ListDepartamentos({ initialData }: { initialData: Depart
         </button>
       </div>
 
-      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
-        <div className="min-w-[320px]">
+      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-x-auto">
+        <div className="min-w-[650px]">
           <div className="flex justify-between items-center px-4 sm:px-6 py-3 bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 rounded-t-xl">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Estructura</span>
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Acciones</span>

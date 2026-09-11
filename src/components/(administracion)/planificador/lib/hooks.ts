@@ -29,7 +29,10 @@ import {
   marcarAsistenciaUbicacion,
   clonarRepertorio,
   guardarDonEspiritual,
-  eliminarDonEspiritual
+  eliminarDonEspiritual,
+  guardarNota,
+  eliminarNota,
+  toggleEstadoNota
 } from "./actions";
 
 import {
@@ -39,7 +42,8 @@ import {
   VideoAdjunto,
   Adjunto,
   EquipoPlantilla,
-  DonEspiritual
+  DonEspiritual,
+  NotaReunion
 } from "./zod";
 
 const CACHE_TIME = 1000 * 60 * 6;
@@ -184,6 +188,22 @@ export const usePlanificadorMutations = () => {
     onSuccess: invalidar,
   });
 
+  // --- Mutaciones de Notas ---
+  const mutationAgregarNota = useMutation({
+    mutationFn: ({ id, nota }: { id: string, nota: Partial<NotaReunion> }) => guardarNota(id, nota),
+    onSuccess: invalidar,
+  });
+
+  const mutationBorrarNota = useMutation({
+    mutationFn: ({ notaId }: { notaId: string }) => eliminarNota(notaId),
+    onSuccess: invalidar,
+  });
+
+  const mutationToggleNota = useMutation({
+    mutationFn: ({ notaId, estadoActual }: { notaId: string, estadoActual: string | null | undefined }) => toggleEstadoNota(notaId, estadoActual),
+    onSuccess: invalidar,
+  });
+
   return {
     guardar,
     eliminar,
@@ -202,6 +222,9 @@ export const usePlanificadorMutations = () => {
     importarRepertorio: mutationImportarRepertorio,
     agregarDon: mutationAgregarDon,
     borrarDon: mutationBorrarDon,
+    agregarNota: mutationAgregarNota,
+    borrarNota: mutationBorrarNota,
+    toggleNota: mutationToggleNota,
     isLoading: guardar.isPending || eliminar.isPending || responderInvitacion.isPending ||
       darDeBaja.isPending || sustituirMiembro.isPending || updateChecklist.isPending ||
       mutationAgregarVideo.isPending || mutationAgregarAdjunto.isPending || mutationAgregarDrive.isPending

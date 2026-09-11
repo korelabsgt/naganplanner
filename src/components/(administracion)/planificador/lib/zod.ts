@@ -44,6 +44,20 @@ export type VideoAdjunto = z.infer<typeof videoSchema>;
 export type ArchivoDrive = z.infer<typeof driveSchema>;
 export type DonEspiritual = z.infer<typeof donEspiritualSchema>;
 
+// --- Schema para Notas de Reunión ---
+export const notaReunionSchema = z.object({
+  id: z.string().uuid(),
+  actividad_id: z.string().uuid(),
+  nota: z.string(),
+  descripcion: z.string().nullable().optional(),
+  responsable_id: z.string().uuid().nullable().optional(),
+  estado: z.string().nullable().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
+});
+
+export type NotaReunion = z.infer<typeof notaReunionSchema>;
+
 // 1. Schema para lectura de un Integrante
 export const integranteSchema = z.object({
   id: z.string().uuid().optional(),
@@ -90,6 +104,8 @@ export const planificadorSchema = z.object({
   })).nullable().optional().default([]),
   
   dones_espirituales: z.array(donEspiritualSchema).nullable().optional().default([]),
+  
+  notas_reunion: z.array(notaReunionSchema).nullable().optional().default([]),
 
   creator: z.object({
     nombre: z.string()
@@ -133,6 +149,7 @@ export const planificadorFormSchema = z.object({
     .refine((items) => items.filter(i => i.es_encargado).length >= 1, {
       message: "Debe haber al menos un (1) encargado seleccionado"
     }),
+  origen_id_para_duplicar: z.string().uuid().optional(),
 });
 
 export const perfilSchema = z.object({

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Save, Sparkles, Loader2, Trash2, Layers, Tag, Users, UserPlus, ClipboardList, Dices, Building2, Briefcase, Plus, ChevronDown } from 'lucide-react';
+import { X, Save, Sparkles, Loader2, Trash2, Layers, Tag, Users, UserPlus, ClipboardList, Dices, Building2, Briefcase, Plus, ChevronDown, Copy, Edit2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { usePlanificadorMutations, useGestorEquipos } from '../lib/hooks';
 import { PlanificadorForm, planificadorFormSchema, Perfil, Planificador, ChecklistItem, VideoAdjunto } from '../lib/zod';
@@ -50,13 +50,14 @@ interface Props {
   tipoVista: 'mis_actividades' | 'mi_equipo' | 'todas';
   departamentosEquipo?: DeptoEquipo[];
   tiposServicio?: string[];
+  isDuplicating?: boolean;
 }
 
-export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioActualId, planificadorEditar, isJefe, modulo, tipoVista, departamentosEquipo = [], tiposServicio = [] }: Props) {
+export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioActualId, planificadorEditar, isJefe, modulo, tipoVista, departamentosEquipo = [], tiposServicio = [], isDuplicating = false }: Props) {
   const { guardar, eliminar } = usePlanificadorMutations();
   const { cargarMiembros, plantillas } = useGestorEquipos();
 
-  const isEditing = !!planificadorEditar;
+  const isEditing = !!planificadorEditar && !isDuplicating;
   const isModuloLocked = modulo && modulo !== 'todas';
   const isAdminGlobalView = tipoVista === 'todas';
   const isReunionView = modulo === 'reunion';
@@ -321,7 +322,7 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
       title,
       description,
       due_date: dueDate,
-      checklist,
+      checklist: isDuplicating ? checklist.filter(c => !c.is_completed).map(c => ({ ...c, is_completed: false })) : checklist,
       modulo: selectedModulo,
       status: selectedStatus,
       videos_url: videosUrl,
@@ -330,7 +331,8 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
         es_encargado: i.es_encargado,
         rol: i.rol,
         es_nuevo: i.is_new
-      }))
+      })),
+      ...(isDuplicating && planificadorEditar?.id ? { origen_id_para_duplicar: planificadorEditar.id } : {})
     };
     const validation = planificadorFormSchema.safeParse(rawData);
     if (!validation.success) {
@@ -343,7 +345,7 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
       return;
     }
     try {
-      await guardar.mutateAsync({ data: rawData as PlanificadorForm, id: planificadorEditar?.id });
+      await guardar.mutateAsync({ data: rawData as PlanificadorForm, id: isDuplicating ? undefined : planificadorEditar?.id });
       onClose();
     } catch (error: any) { }
   };
@@ -436,10 +438,29 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
           <div className="px-6 sm:px-8 py-4 sm:py-5 border-b border-gray-100 dark:border-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-white dark:bg-[#1a1a1a]">
 
             <div className="flex items-center justify-between sm:justify-start gap-3 flex-1 min-w-0">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2 whitespace-nowrap shrink-0">
-                {isEditing ? <Save className="text-blue-600" size={20} /> : <Sparkles className="text-blue-600" size={20} />}
-                {isEditing ? 'Editar Actividad' : 'Nueva Actividad'}
-              </h2>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                  {isDuplicating ? (
+                    <>
+                      <Copy size={24} className="text-blue-500" />
+                      Duplicar Actividad
+                    </>
+                  ) : isEditing ? (
+                    <>
+                      <Edit2 size={24} className="text-blue-500" />
+                      Editar Actividad
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={24} className="text-blue-500" />
+                      Nueva Actividad
+                    </>
+                  )}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {isDuplicating ? "Modifica los detalles antes de crear la copia." : (isEditing ? "Modifica los detalles de esta actividad." : "Completa la información para registrar una actividad.")}
+                </p>
+              </div>
 
               <button onClick={onClose} className="sm:hidden p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors text-gray-400 shrink-0">
                 <X size={22} />
@@ -506,7 +527,7 @@ export default function NuevoPlanificador({ isOpen, onClose, usuarios, usuarioAc
                   disabled={guardar.isPending}
                 />
 
-                {!isEditing && (
+                {!isEditing && selectedStatus !== 'reunion' && (
                   <div className="animate-in fade-in duration-300">
                     <div className="h-px bg-gray-100 dark:bg-neutral-800 mb-8" />
                     <SeccionChecklist checklist={checklist} setChecklist={setChecklist} />

@@ -86,17 +86,18 @@ export default function DonesList({ initialData }: Props) {
           </div>
         </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setVistaActual('impresion')}
-              className="flex items-center justify-center w-11 h-11 bg-[#F8AC32]/10 hover:bg-[#F8AC32]/20 text-[#F8AC32] rounded-xl transition-colors shrink-0 print:hidden"
-              title="Previsualizar e Imprimir"
-            >
-              <Printer size={18} />
-            </button>
-            <div className="relative print:hidden shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={() => setVistaActual('impresion')}
+                className="flex items-center justify-center w-11 h-11 bg-[#F8AC32]/10 hover:bg-[#F8AC32]/20 text-[#F8AC32] rounded-xl transition-colors shrink-0 print:hidden"
+                title="Previsualizar e Imprimir"
+              >
+                <Printer size={18} />
+              </button>
+              <div className="relative print:hidden flex-1 sm:flex-none">
               <div 
-                className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 dark:bg-neutral-800/50 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-neutral-700 rounded-xl cursor-pointer"
+                className="flex items-center justify-between gap-3 w-full px-4 py-2.5 bg-gray-50 dark:bg-neutral-800/50 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-neutral-700 rounded-xl cursor-pointer"
                 onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
               >
                 <button 
@@ -162,6 +163,7 @@ export default function DonesList({ initialData }: Props) {
                 </>
               )}
             </div>
+          </div>
             <div className="relative w-full sm:w-64 print:hidden">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -184,8 +186,8 @@ export default function DonesList({ initialData }: Props) {
                 <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center whitespace-nowrap w-16">No.</th>
                 <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center whitespace-nowrap w-32"><div className="flex items-center justify-center gap-2"><Calendar size={14}/> Fecha</div></th>
                 <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center whitespace-nowrap w-48"><div className="flex items-center justify-center gap-2"><Quote size={14}/> Nombre</div></th>
-                <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center min-w-[200px] w-[35%]"><div className="flex items-center justify-center gap-2"><MessageSquare size={14}/> Palabras</div></th>
-                <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center min-w-[200px] w-[25%]"><div className="flex items-center justify-center gap-2"><BookOpen size={14}/> Citas</div></th>
+                <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center min-w-[200px] w-[25%]"><div className="flex items-center justify-center gap-2"><MessageSquare size={14}/> Palabras</div></th>
+                <th className="py-4 px-6 text-xs font-bold text-white uppercase tracking-wider text-center min-w-[200px] w-[35%]"><div className="flex items-center justify-center gap-2"><BookOpen size={14}/> Citas</div></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
@@ -223,7 +225,7 @@ export default function DonesList({ initialData }: Props) {
                           {don.palabras}
                         </p>
                       </td>
-                      <td className="py-4 px-6 text-sm text-gray-500 dark:text-gray-400 align-middle text-center">
+                      <td className="py-4 px-6 text-sm text-gray-500 dark:text-gray-400 align-middle text-justify leading-relaxed">
                         {don.citas_biblicas || <span className="opacity-50 italic">Sin citas</span>}
                       </td>
                     </tr>

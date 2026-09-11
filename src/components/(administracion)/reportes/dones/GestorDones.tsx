@@ -1,8 +1,8 @@
 import { obtenerReporteDones } from './Lib/actions';
 import DonesList from './DonesList';
 
-export default async function GestorDones() {
-  const data = await obtenerReporteDones();
+export default async function GestorDones({ mostrarSoloConCita = false }: { mostrarSoloConCita?: boolean }) {
+  let data = await obtenerReporteDones();
 
   if (data === null) {
     return (
@@ -15,6 +15,10 @@ export default async function GestorDones() {
         </div>
       </div>
     );
+  }
+
+  if (mostrarSoloConCita) {
+    data = data.filter(don => don.citas_biblicas && don.citas_biblicas.trim() !== '');
   }
 
   return (

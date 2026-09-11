@@ -63,9 +63,19 @@ const styles = StyleSheet.create({
     color: '#E09827',
   },
   logoTextApp: {
-    fontSize: 14,
-    fontWeight: 'normal',
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#111827',
+  },
+  churchNameContainer: {
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  churchName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textTransform: 'uppercase',
   },
   table: {
     display: 'flex',
@@ -91,11 +101,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     minHeight: 30,
   },
-  colNo: { width: '5%', fontSize: 9, color: '#4b5563', textAlign: 'center' },
-  colFecha: { width: '12%', fontSize: 8, color: '#111827', textAlign: 'center' },
-  colNombre: { width: '28%', fontSize: 9, color: '#111827', fontWeight: 'bold', textAlign: 'center' },
-  colPalabras: { width: '40%', fontSize: 9, color: '#374151', paddingRight: 8, textAlign: 'justify' },
-  colCitas: { width: '15%', fontSize: 9, color: '#6b7280', textAlign: 'center' },
+  colNo: { width: '4%', fontSize: 9, color: '#4b5563', textAlign: 'center' },
+  colFecha: { width: '10%', fontSize: 8, color: '#111827', textAlign: 'center' },
+  colNombre: { width: '20%', fontSize: 9, color: '#111827', fontWeight: 'bold', textAlign: 'center' },
+  colPalabras: { width: '30%', fontSize: 9, color: '#374151', paddingRight: 8, textAlign: 'justify' },
+  colCitas: { width: '36%', fontSize: 9, color: '#6b7280', paddingRight: 8, textAlign: 'justify' },
   headerText: {
     fontSize: 9,
     fontWeight: 'bold',
@@ -108,6 +118,7 @@ const styles = StyleSheet.create({
 interface Props {
   dones: DonReporte[];
   mesFiltro: string; 
+  nombreIglesia?: string;
 }
 
 const formatFechaPdf = (iso: string | null) => {
@@ -131,10 +142,10 @@ const formatFechaPdf = (iso: string | null) => {
   }
 };
 
-export default function ReporteDonesPDF({ dones, mesFiltro }: Props) {
+export default function ReporteDonesPDF({ dones, mesFiltro, nombreIglesia }: Props) {
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="LEGAL" orientation="landscape" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.titleContainer}>
             <Text style={styles.systemSubtitle}>SISTEMA DE REPORTES</Text>
@@ -151,6 +162,12 @@ export default function ReporteDonesPDF({ dones, mesFiltro }: Props) {
             </View>
           </View>
         </View>
+
+        {nombreIglesia && (
+          <View style={styles.churchNameContainer}>
+            <Text style={styles.churchName}>{nombreIglesia}</Text>
+          </View>
+        )}
 
         <View style={styles.table}>
           <View style={styles.tableHeader}>

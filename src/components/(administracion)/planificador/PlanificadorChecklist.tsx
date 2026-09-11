@@ -179,7 +179,7 @@ export default function PlanificadorChecklist({
               ) : (
                 <span 
                   onDoubleClick={() => !item.is_completed && startEditing(item.originalIndex, item.title)}
-                  className={`text-sm wrap-break-word block ${item.is_completed ? 'text-gray-400 dark:text-gray-500 line-through decoration-gray-400' : 'text-slate-700 dark:text-gray-200'}`}
+                  className="text-sm wrap-break-word block text-slate-700 dark:text-gray-200"
                 >
                   {item.title}
                 </span>
@@ -188,7 +188,7 @@ export default function PlanificadorChecklist({
 
             {/* Botones de Acción */}
             {puedeEditarEstructura && !readOnly && editingIndex !== item.originalIndex && (
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 transition-opacity">
                 <button 
                   onClick={() => startEditing(item.originalIndex, item.title)}
                   className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"

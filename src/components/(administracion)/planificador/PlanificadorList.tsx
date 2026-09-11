@@ -3,16 +3,17 @@
 import { useState, useMemo } from 'react';
 import {
   Plus, Search, Calendar as CalendarIcon,
-  SearchX, LayoutGrid, ArrowLeft, Building2, ChevronDown, ChevronRight, Users, Filter, ClipboardList, Music, BarChart
+  SearchX, LayoutGrid, ArrowLeft, Building2, ChevronDown, ChevronRight, Users, Filter, ClipboardList, Music, BarChart, BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from "@/lib/utils";
 import { Planificador, Perfil } from './lib/zod';
 import { useGestorPlanificador } from './lib/hooks';
 import PlanificadorItem from './PlanificadorItem';
 import NuevoPlanificador from './modals/NuevoPlanificador';
 import GestorEquipos from './modals/GestorEquipos';
-import RegistroSustituciones from './modals/RegistroSustituciones'; // <--- Historial
-import RegistroAlabanzas from './modals/RegistroAlabanzas'; // <--- Alabanzas
+import RegistroSustituciones from './modals/RegistroSustituciones';
+import RegistroAlabanzas from './modals/RegistroAlabanzas';
 
 type DeptoEquipo = {
   id: string;
@@ -189,7 +190,7 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
     const map: Record<string, Planificador[]> = {};
     listaFinal.forEach((plan) => {
       let fechaKey = 'sin-fecha';
-      
+
       if (plan.due_date) {
         // En lugar de hacer split('T'), usamos el objeto Date para obtener el año/mes/día LOCAL
         const d = new Date(plan.due_date);
@@ -204,7 +205,7 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
     });
 
     const isProximos = filtroEstado === 'Próximos';
-    
+
     const grupos = Object.entries(map).sort((a, b) => {
       return isProximos ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]);
     });
@@ -238,19 +239,19 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
                   return isProximos ? dateA - dateB : dateB - dateA;
                 })
                 .map((plan) => (
-                <PlanificadorItem
-                  key={plan.id}
-                  planificador={plan}
-                  usuarios={usuarios}
-                  usuarioActualId={perfil.id}
-                  isExpanded={expandedId === plan.id}
-                  onToggle={() => setExpandedId(expandedId === plan.id ? null : plan.id)}
-                  isJefe={isJefe}
-                  modulo={modulo}
-                  tipoVista={tipoVista}
-                  departamentosEquipo={departamentosEquipo}
-                />
-              ))}
+                  <PlanificadorItem
+                    key={plan.id}
+                    planificador={plan}
+                    usuarios={usuarios}
+                    usuarioActualId={perfil.id}
+                    isExpanded={expandedId === plan.id}
+                    onToggle={() => setExpandedId(expandedId === plan.id ? null : plan.id)}
+                    isJefe={isJefe}
+                    modulo={modulo}
+                    tipoVista={tipoVista}
+                    departamentosEquipo={departamentosEquipo}
+                  />
+                ))}
             </div>
           </div>
         ))}
@@ -259,7 +260,7 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
   };
 
   const isVistaDepartamentos = (tipoVista === 'mi_equipo' || tipoVista === 'todas') && departamentosEquipo.length > 0;
-  
+
   // --- ASIGNACIÓN ÚNICA DE ACTIVIDADES A DEPARTAMENTOS ---
   // Algoritmo para encontrar el departamento más adecuado (Lowest Common Ancestor aproximado)
   const { mapActividadesPorDepto, actosDirectosFallback } = useMemo(() => {
@@ -269,7 +270,7 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
     // 1. Precomputar los "miembrosExtendidos" de cada departamento (incluyendo todos sus sub-departamentos)
     const deptosConExtendidos = departamentosEquipo.map(depto => {
       const miembrosSet = new Set<string>();
-      
+
       const agregarFamilia = (idActual: string) => {
         const d = departamentosEquipo.find(x => x.id === idActual);
         if (d) {
@@ -278,27 +279,32 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
           hijos.forEach(hijo => agregarFamilia(hijo.id));
         }
       };
-      
+
       agregarFamilia(depto.id);
-      
+
       return {
         ...depto,
         miembrosExtendidos: Array.from(miembrosSet)
       };
     });
 
-    // 2. Asignar cada actividad a un ÚNICO departamento
+    // Filtramos SOLO las dependencias padre (aquellas que no tienen padre, o su padre no está en la lista visible)
+    const topLevelDeptos = deptosConExtendidos.filter(d => 
+      !d.parent_id || !departamentosEquipo.some(x => x.id === d.parent_id)
+    );
+
+    // 2. Asignar cada actividad a un ÚNICO departamento padre
     planificadoresGrupales.forEach(p => {
       const integrantesIds = p.integrantes.map(i => i.usuario_id);
       const encargado = p.integrantes.find(i => i.es_encargado);
 
-      // Calcular la cobertura
-      const coberturaDeptos = deptosConExtendidos.map(depto => {
+      // Calcular la cobertura solo contra los departamentos padre
+      const coberturaDeptos = topLevelDeptos.map(depto => {
         // ¿Cuántos miembros de la actividad pertenecen a este departamento o a sus hijos?
         const matchCount = integrantesIds.filter(id => depto.miembrosExtendidos.includes(id)).length;
         // ¿El líder pertenece explícitamente a este departamento extendido?
         const tieneEncargado = encargado ? depto.miembrosExtendidos.includes(encargado.usuario_id) : false;
-        
+
         return {
           deptoId: depto.id,
           matchCount,
@@ -312,17 +318,15 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
         return;
       }
 
-      // Ordenar para encontrar el "mejor" departamento:
+      // Ordenar para encontrar el "mejor" departamento padre:
       coberturaDeptos.sort((a, b) => {
-        // 1. El que agrupe a MÁS miembros de la actividad (Ej. Padre agrupa a todos, hijo solo a algunos)
-        if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount; 
-        
+        // 1. El que agrupe a MÁS miembros de la actividad
+        if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+
         // 2. Desempate: El que tenga al Encargado (Líder)
         if (b.tieneEncargado !== a.tieneEncargado) return b.tieneEncargado ? 1 : -1;
-        
-        // 3. Desempate: Si agrupan a la misma cantidad de miembros (ej. todos son coristas),
-        // preferimos el MÁS ESPECÍFICO (es decir, el departamento más pequeño / sub-departamento).
-        return a.totalExtendidos - b.totalExtendidos; 
+
+        return 0;
       });
 
       const bestDeptoId = coberturaDeptos[0].deptoId;
@@ -353,56 +357,87 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
               </p>
             </div>
 
-            {(isJefe && (modulo !== 'reunion' || ['admin', 'super', 'rrhh'].includes(perfil.rol?.toLowerCase() || ''))) && (
-              <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide">
-                {/* BOTÓN HISTORIAL DE SUSTITUCIONES */}
-                <button
-                  onClick={() => setIsRegistroOpen(true)}
-                  className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 p-3 rounded-2xl transition-colors border border-amber-100 dark:border-amber-800 shrink-0"
-                  title="Registro de Sustituciones"
-                >
-                  <ClipboardList size={20} />
-                </button>
+            {(isJefe && (modulo !== 'reunion' || ['admin', 'super', 'rrhh'].includes(perfil.rol?.toLowerCase() || ''))) && (() => {
+              const showHistorial = true;
+              const showBanco = !(modulo === 'reunion' || (tipoVista === 'todas' && modulo === 'todas'));
+              const showEstadisticas = modulo === 'alabanza' && (isJefe || ['super', 'admin', 'lider'].includes(perfil?.rol?.toLowerCase() || ''));
+              const showDones = ['alabanza', 'danza', 'danza-damas', 'danza-caballeros', 'multimedia', 'reunion'].includes(modulo) && (isJefe || ['super', 'admin', 'lider'].includes(perfil?.rol?.toLowerCase() || ''));
+              const showEquipos = true;
 
-                {/* BOTÓN BANCO ALABANZAS - Ocultar en Global y en Reunion */}
-                {!(modulo === 'reunion' || (tipoVista === 'todas' && modulo === 'todas')) && (
+              const numIcons = [showHistorial, showBanco, showEstadisticas, showDones, showEquipos].filter(Boolean).length;
+              const isWrappedLayout = numIcons >= 5;
+
+              return (
+                <div className={cn("flex sm:flex-row gap-3 w-full md:w-auto", isWrappedLayout ? "flex-col items-stretch sm:items-center" : "flex-row items-center justify-between")}>
+                  <div className={cn("flex items-center gap-2 shrink-0", isWrappedLayout ? "justify-center sm:justify-start w-full sm:w-auto overflow-x-auto scrollbar-hide pb-1 sm:pb-0" : "")}>
+                    {/* BOTÓN HISTORIAL DE SUSTITUCIONES */}
+                    {showHistorial && (
+                      <button
+                        onClick={() => setIsRegistroOpen(true)}
+                        className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 p-3 rounded-2xl transition-colors border border-amber-100 dark:border-amber-800 shrink-0"
+                        title="Registro de Sustituciones"
+                      >
+                        <ClipboardList size={20} />
+                      </button>
+                    )}
+
+                    {/* BOTÓN BANCO ALABANZAS */}
+                    {showBanco && (
+                      <button
+                        onClick={() => setIsAlabanzasOpen(true)}
+                        className="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 p-3 rounded-2xl transition-colors border border-purple-100 dark:border-purple-800 shrink-0"
+                        title="Banco de Alabanzas"
+                      >
+                        <Music size={20} />
+                      </button>
+                    )}
+
+                    {/* BOTÓN ESTADÍSTICAS ALABANZAS */}
+                    {showEstadisticas && (
+                      <Link
+                        href="/kore/reportes/alabanzas?from=planificador"
+                        className="bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 p-3 rounded-2xl transition-colors border border-sky-100 dark:border-sky-800 shrink-0"
+                        title="Estadísticas de Alabanzas"
+                      >
+                        <BarChart size={20} />
+                      </Link>
+                    )}
+
+                    {/* BOTÓN REPORTE DE DONES */}
+                    {showDones && (
+                      <Link
+                        href={`/kore/planificador/${modulo}/dones`}
+                        className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 p-3 rounded-2xl transition-colors border border-rose-100 dark:border-rose-800 shrink-0"
+                        title="Reporte de Dones"
+                      >
+                        <BookOpen size={20} />
+                      </Link>
+                    )}
+
+                    {/* BOTÓN GESTOR DE EQUIPOS */}
+                    {showEquipos && (
+                      <button
+                        onClick={() => setIsGestorEquiposOpen(true)}
+                        className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 p-3 rounded-2xl transition-colors border border-indigo-100 dark:border-indigo-800 shrink-0"
+                        title="Gestionar Plantillas de Equipo"
+                      >
+                        <Users size={20} />
+                      </button>
+                    )}
+                  </div>
+
                   <button
-                    onClick={() => setIsAlabanzasOpen(true)}
-                    className="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 p-3 rounded-2xl transition-colors border border-purple-100 dark:border-purple-800 shrink-0"
-                    title="Banco de Alabanzas"
+                    onClick={() => setIsModalOpen(true)}
+                    className={cn(
+                      "bg-[#d6a738] hover:bg-[#c08e2a] text-white py-3 rounded-2xl font-bold shadow-lg shadow-[#d6a738]/20 dark:shadow-none transition-all flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 text-[13px] sm:text-sm whitespace-nowrap shrink-0",
+                      isWrappedLayout ? "w-full sm:w-auto px-4 sm:px-6" : "flex-1 md:flex-none px-4 sm:px-6"
+                    )}
                   >
-                    <Music size={20} />
+                    <Plus size={18} className={cn("shrink-0", isWrappedLayout ? "" : "hidden sm:block")} /> Nueva Actividad
                   </button>
-                )}
-
-                {/* BOTÓN ESTADÍSTICAS ALABANZAS - Solo para SUPER, ADMIN, LIDERES en el módulo de alabanza */}
-                {modulo === 'alabanza' && (isJefe || ['super', 'admin', 'lider'].includes(perfil?.rol?.toLowerCase() || '')) && (
-                  <Link
-                    href="/kore/reportes/alabanzas?from=planificador"
-                    className="bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 p-3 rounded-2xl transition-colors border border-sky-100 dark:border-sky-800 shrink-0"
-                    title="Estadísticas de Alabanzas"
-                  >
-                    <BarChart size={20} />
-                  </Link>
-                )}
-
-                {/* BOTÓN GESTOR DE EQUIPOS */}
-                <button
-                  onClick={() => setIsGestorEquiposOpen(true)}
-                  className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 p-3 rounded-2xl transition-colors border border-indigo-100 dark:border-indigo-800 shrink-0"
-                  title="Gestionar Plantillas de Equipo"
-                >
-                  <Users size={20} />
-                </button>
-
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex-1 md:flex-none bg-[#d6a738] hover:bg-[#c08e2a] text-white px-4 sm:px-6 py-3 rounded-2xl font-bold shadow-lg shadow-[#d6a738]/20 dark:shadow-none transition-all flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 text-[13px] sm:text-sm whitespace-nowrap"
-                >
-                  <Plus size={18} className="hidden sm:block shrink-0" /> Nueva Actividad
-                </button>
-              </div>
-            )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="flex flex-col xl:flex-row gap-4 items-center">

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Music, X, User, Loader2, ChevronDown, Check } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Music, X, User, Loader2, ChevronDown, Check, ArrowRightLeft, Search } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { cn } from "@/lib/utils";
-import { asignarDirectorCanto } from '../lib/actions/alabanzas';
+import { asignarDirectorCanto, actualizarObservacionCantoActividad, sustituirCantoActividad, obtenerBancoAlabanzas } from '../lib/actions/alabanzas';
 import Swal from 'sweetalert2';
+import { useQuery } from '@tanstack/react-query';
 
 interface Song {
   id: string;
@@ -76,6 +77,80 @@ export default function ModalRepertorioActividad({ isOpen, onClose, songs, activ
       });
     } finally {
       setLoadingAssignment(null);
+    }
+  };
+
+  const handleUpdateObservaciones = async (songId: string, newObservaciones: string) => {
+    if (!puedeGestionar) return;
+
+    try {
+      // Optimistic UI update
+      setLocalSongs(prev => prev.map(s => 
+        s.id === songId ? { ...s, observaciones: newObservaciones } : s
+      ));
+
+      await actualizarObservacionCantoActividad(actividadId, songId, newObservaciones || null);
+      
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Observación guardada',
+        showConfirmButton: false,
+        timer: 1500,
+        target: '#modal-repertorio-alabanzas'
+      });
+    } catch (err: any) {
+      // Revertir (opcional, en este caso lo dejamos o recargamos)
+      Swal.fire({
+        title: 'Error',
+        text: err.message,
+        icon: 'error',
+        target: '#modal-repertorio-alabanzas'
+      });
+    }
+  };
+
+  const handleSustituir = async (oldSongId: string, newSongId: string, newSongData: any) => {
+    if (!puedeGestionar) return;
+
+    try {
+      await sustituirCantoActividad(actividadId, oldSongId, newSongId);
+      
+      // Actualización optimista de la lista local
+      setLocalSongs(prev => prev.map(s => {
+        if (s.id === oldSongId) {
+          return {
+            ...s,
+            id: newSongId,
+            nombre: newSongData.nombre,
+            tipo: newSongData.tipo,
+            tonalidad: newSongData.tonalidad,
+            bpm: newSongData.bpm,
+            compas: newSongData.compas
+            // Mantiene el director_id y observaciones
+          };
+        }
+        return s;
+      }));
+
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Canto sustituido',
+        showConfirmButton: false,
+        timer: 2000,
+        target: '#modal-repertorio-alabanzas'
+      });
+    } catch (err: any) {
+      Swal.fire({
+        title: 'Error',
+        text: err.message,
+        icon: 'error',
+        target: '#modal-repertorio-alabanzas'
+      });
+      throw err;
     }
   };
 
@@ -170,7 +245,20 @@ export default function ModalRepertorioActividad({ isOpen, onClose, songs, activ
                     <tbody className="bg-white dark:bg-[#1a1a1a] text-[#4a3f36] dark:text-[#f4ebc3] font-medium text-[13px]">
                       {groupedSongs[tipo].map((song) => (
                         <tr key={song.id} className="border-b border-neutral-100 dark:border-[#2a2624] last:border-none hover:bg-neutral-50 dark:hover:bg-[#2a2624]/50 transition-colors">
-                          <td className="px-5 py-3 border-r border-neutral-100 dark:border-[#2a2624] font-bold truncate" title={song.nombre}>{song.nombre}</td>
+                          <td className="px-5 py-3 border-r border-neutral-100 dark:border-[#2a2624]">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold truncate" title={song.nombre}>{song.nombre}</span>
+                              {puedeGestionar && (
+                                <SustituirSelector 
+                                  song={song}
+                                  actividadId={actividadId}
+                                  currentSongs={localSongs}
+                                  onSustituir={handleSustituir}
+                                  disabled={!puedeGestionar}
+                                />
+                              )}
+                            </div>
+                          </td>
                           <td className="px-5 py-3 border-r border-neutral-100 dark:border-[#2a2624] text-center font-black text-[#d6a738]">{song.tonalidad || '-'}</td>
                           <td className="px-5 py-3 border-r border-neutral-100 dark:border-[#2a2624] text-center opacity-80">{song.bpm || '-'}</td>
                           <td className="px-5 py-3 border-r border-neutral-100 dark:border-[#2a2624] text-center opacity-80">{song.compas || '-'}</td>
@@ -183,7 +271,42 @@ export default function ModalRepertorioActividad({ isOpen, onClose, songs, activ
                                disabled={!puedeGestionar}
                             />
                           </td>
-                          <td className="px-5 py-3 opacity-60 italic truncate" title={song.observaciones || ''}>{song.observaciones || ''}</td>
+                          <td className="px-5 py-3">
+                            <textarea 
+                              className="w-full bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-[#d6a738] outline-none text-[13px] italic opacity-80 focus:opacity-100 transition-colors px-1 py-1 resize-none overflow-hidden block"
+                              defaultValue={song.observaciones || ''}
+                              placeholder={puedeGestionar ? "Añadir nota..." : ""}
+                              disabled={!puedeGestionar}
+                              rows={1}
+                              ref={(el) => {
+                                if (el) {
+                                  el.style.height = 'auto';
+                                  el.style.height = `${el.scrollHeight}px`;
+                                }
+                              }}
+                              onInput={(e) => {
+                                const target = e.target as HTMLTextAreaElement;
+                                target.style.height = 'auto';
+                                target.style.height = `${target.scrollHeight}px`;
+                              }}
+                              onFocus={(e) => {
+                                const target = e.target as HTMLTextAreaElement;
+                                target.style.height = 'auto';
+                                target.style.height = `${target.scrollHeight}px`;
+                              }}
+                              onBlur={(e) => {
+                                if (e.target.value !== (song.observaciones || '')) {
+                                  handleUpdateObservaciones(song.id, e.target.value);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -207,10 +330,19 @@ export default function ModalRepertorioActividad({ isOpen, onClose, songs, activ
                       </div>
                       
                       {/* Cuerpo de la tarjeta */}
-                      <div className="py-6 px-4 flex items-center justify-center text-center">
+                      <div className="py-5 px-4 flex flex-col items-center justify-center text-center gap-2">
                         <h4 className="text-base font-black text-[#4a3f36] dark:text-[#f4ebc3] uppercase tracking-tight">
                           {song.nombre}
                         </h4>
+                        {puedeGestionar && (
+                          <SustituirSelector 
+                            song={song}
+                            actividadId={actividadId}
+                            currentSongs={localSongs}
+                            onSustituir={handleSustituir}
+                            disabled={!puedeGestionar}
+                          />
+                        )}
                       </div>
 
                       {/* Footer de la tarjeta con 3 columnas */}
@@ -243,12 +375,43 @@ export default function ModalRepertorioActividad({ isOpen, onClose, songs, activ
                          />
                       </div>
 
-                      {/* Observaciones (Solo si existen) */}
-                      {song.observaciones && (
-                        <div className="px-4 py-3 bg-neutral-50 dark:bg-black/50 border-t border-neutral-100 dark:border-[#2a2624] text-[11px] text-gray-500 dark:text-gray-400 italic text-center">
-                          "{song.observaciones}"
-                        </div>
-                      )}
+                      {/* Observaciones (Móvil) */}
+                      <div className="px-4 py-3 bg-neutral-50 dark:bg-black/50 border-t border-neutral-100 dark:border-[#2a2624]">
+                        <textarea 
+                          className="w-full bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-[#d6a738] outline-none text-[11px] text-gray-500 dark:text-gray-400 italic text-center transition-colors px-1 py-1 resize-none overflow-hidden block"
+                          defaultValue={song.observaciones || ''}
+                          placeholder={puedeGestionar ? "Añadir nota u observación..." : ""}
+                          disabled={!puedeGestionar}
+                          rows={1}
+                          ref={(el) => {
+                            if (el) {
+                              el.style.height = 'auto';
+                              el.style.height = `${el.scrollHeight}px`;
+                            }
+                          }}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                          onFocus={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value !== (song.observaciones || '')) {
+                              handleUpdateObservaciones(song.id, e.target.value);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              e.currentTarget.blur();
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -383,6 +546,138 @@ function DirectorSelector({
                   </div>
                )}
              </div>
+          </div>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
+  );
+}
+
+function SustituirSelector({ 
+  song, 
+  actividadId,
+  currentSongs,
+  onSustituir,
+  disabled 
+}: { 
+  song: Song; 
+  actividadId: string;
+  currentSongs: Song[];
+  onSustituir: (oldId: string, newId: string, newSongData: any) => Promise<void>;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [isSubstituting, setIsSubstituting] = useState(false);
+
+  const { data: banco = [], isLoading } = useQuery({
+    queryKey: ['banco-alabanzas'],
+    queryFn: () => obtenerBancoAlabanzas(),
+    enabled: open
+  });
+
+  const filteredBanco = useMemo(() => {
+    const currentIds = new Set(currentSongs.map(s => s.id));
+    return banco.filter((s: any) => {
+      const isNotCurrent = !currentIds.has(s.id) || s.id === song.id;
+      const matchSearch = s.nombre.toLowerCase().includes(busqueda.toLowerCase());
+      const matchTipo = s.tipo?.toLowerCase() === song.tipo?.toLowerCase();
+      return isNotCurrent && matchSearch && matchTipo;
+    });
+  }, [banco, busqueda, currentSongs, song.id, song.tipo]);
+
+  const handleSelect = async (newSong: any) => {
+    if (newSong.id === song.id) {
+      setOpen(false);
+      return;
+    }
+    
+    setIsSubstituting(true);
+    try {
+      await onSustituir(song.id, newSong.id, newSong);
+      setOpen(false);
+    } catch (e) {
+      // error handled in parent
+    } finally {
+      setIsSubstituting(false);
+    }
+  };
+
+  return (
+    <PopoverPrimitive.Root open={open} onOpenChange={(v) => !disabled && setOpen(v)}>
+      <PopoverPrimitive.Trigger 
+        disabled={disabled || isSubstituting}
+        className={cn(
+          "w-fit flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border transition-all text-[10px] font-bold outline-none",
+          "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700/50 text-[#4a3f36] dark:text-gray-400 hover:border-[#d6a738]/50 hover:text-[#d6a738] hover:bg-[#d6a738]/10",
+          isSubstituting ? "opacity-50 pointer-events-none" : "",
+          disabled ? "cursor-default opacity-80 hover:border-transparent hover:text-inherit hover:bg-transparent" : "cursor-pointer"
+        )}
+        title="Sustituir Canto"
+      >
+        {isSubstituting ? (
+          <Loader2 size={12} className="animate-spin text-[#d6a738]" />
+        ) : (
+          <ArrowRightLeft size={12} />
+        )}
+        <span>Sustituir</span>
+      </PopoverPrimitive.Trigger>
+
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="start"
+          sideOffset={4}
+          className="z-[110] w-[260px] p-2 rounded-xl bg-white dark:bg-[#131211] border border-neutral-200 dark:border-[#2a2624] shadow-2xl animate-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 flex flex-col gap-2"
+        >
+          <div className="px-2 py-1.5 text-[9px] font-black text-[#847563] uppercase tracking-widest border-b border-neutral-100 dark:border-[#2a2624]">
+            Sustituir Canto
+          </div>
+          
+          <div className="relative px-1">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input 
+              type="text"
+              className="w-full bg-neutral-100 dark:bg-[#1a1a1a] border border-neutral-200 dark:border-[#2a2624] rounded-md pl-7 pr-2 py-1.5 text-xs outline-none focus:border-[#d6a738] transition-colors"
+              placeholder="Buscar canción..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()} 
+            />
+          </div>
+
+          <div 
+            className="max-h-[220px] overflow-y-auto custom-scrollbar flex flex-col gap-1 pr-1 pointer-events-auto"
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
+            {isLoading ? (
+              <div className="flex justify-center py-4">
+                <Loader2 size={16} className="animate-spin text-gray-400" />
+              </div>
+            ) : filteredBanco.length === 0 ? (
+              <div className="px-2 py-4 text-center text-[10px] text-gray-500 italic">
+                No se encontraron resultados
+              </div>
+            ) : (
+              filteredBanco.map((s: any) => (
+                <button
+                  key={s.id}
+                  onClick={() => handleSelect(s)}
+                  className={cn(
+                    "flex flex-col items-start px-2 py-1.5 w-full text-left rounded-lg transition-all outline-none",
+                    s.id === song.id 
+                       ? "bg-[#d6a738]/10 text-[#d6a738]" 
+                       : "text-[#4a3f36] dark:text-gray-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  )}
+                >
+                  <span className="text-[11px] font-bold truncate w-full">{s.nombre}</span>
+                  <div className="flex gap-2 text-[9px] opacity-70 mt-0.5">
+                    <span>{s.tipo}</span>
+                    {s.tonalidad && <span>• {s.tonalidad}</span>}
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>

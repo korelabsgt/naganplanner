@@ -15,6 +15,7 @@ import GestorArchivos from './modals/GestorArchivos';
 import GestorVideo from './modals/GestorVideo';
 import GestorDrive from './modals/GestorDrive';
 import GestorDones from './modals/GestorDones';
+import GestorNotas from './modals/GestorNotas';
 import GestorAlabanzaActividad from './modals/GestorAlabanzaActividad';
 import ModalRepertorioActividad from './modals/ModalRepertorioActividad';
 import { obtenerRepertoriosDelMismoDia } from './lib/actions';
@@ -51,6 +52,7 @@ export default function PlanificadorItem({
   departamentosEquipo = []
 }: Props) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
 
   const [forceShowFiles, setForceShowFiles] = useState(false);
   const [forceShowVideos, setForceShowVideos] = useState(false);
@@ -118,7 +120,7 @@ export default function PlanificadorItem({
       case 'servicio_especial':
       case 'especial': return 'Servicio Especial';
       case 'reunion': return 'Reunión';
-      default: 
+      default:
         if (!status) return 'General';
         return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
     }
@@ -137,6 +139,7 @@ export default function PlanificadorItem({
   const driveSeguros = planificador.archivos_drive ?? [];
   const alabanzasSeguras = (planificador as any).alabanzas ?? [];
   const donesSeguros = (planificador as any).dones_espirituales ?? [];
+  const notasSeguras = (planificador as any).notas_reunion ?? [];
 
   const showFiles = adjuntosSeguros.length > 0 || forceShowFiles;
   const showVideos = videosSeguros.length > 0 || forceShowVideos;
@@ -163,51 +166,54 @@ export default function PlanificadorItem({
 
     const isDark = document.documentElement.classList.contains('dark');
 
-    Swal.fire({
-      title: '¿Importar Repertorio?',
-      text: 'Esto reemplazará cualquier canción que ya tengas seleccionada en esta actividad.',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, importar',
-      cancelButtonText: 'Cancelar',
-      heightAuto: false,     // Crucial para evitar congelamientos en iOS/móviles
-      scrollbarPadding: false, // Crucial para evitar congelamientos
-      showLoaderOnConfirm: true,
-      background: isDark ? '#1a1a1a' : '#ffffff',
-      color: isDark ? '#ffffff' : '#1f2937',
-      buttonsStyling: false,
-      customClass: {
-        popup: 'rounded-3xl shadow-2xl border border-gray-100 dark:border-neutral-800',
-        confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-2.5 mx-2',
-        cancelButton: 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl px-6 py-2.5 mx-2'
-      },
-      preConfirm: async () => {
-        try {
-          await importarRepertorio.mutateAsync({ origenId, destinoId: planificador.id });
-          return true;
-        } catch (error: any) {
-          Swal.showValidationMessage(`Error al importar: ${error.message}`);
-          return false;
+    setTimeout(() => {
+      Swal.fire({
+        title: '¿Importar Repertorio?',
+        text: 'Esto reemplazará cualquier canción que ya tengas seleccionada en esta actividad.',
+        icon: 'question',
+        width: '500px', // Hacerlo más ancho
+        showCancelButton: true,
+        confirmButtonText: 'Sí, importar',
+        cancelButtonText: 'Cancelar',
+        heightAuto: false,
+        scrollbarPadding: false,
+        showLoaderOnConfirm: true,
+        background: isDark ? '#1a1a1a' : '#ffffff',
+        color: isDark ? '#ffffff' : '#1f2937',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'rounded-3xl shadow-2xl border border-gray-100 dark:border-neutral-800',
+          confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-2.5 mx-2',
+          cancelButton: 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl px-6 py-2.5 mx-2'
+        },
+        preConfirm: async () => {
+          try {
+            await importarRepertorio.mutateAsync({ origenId, destinoId: planificador.id });
+            return true;
+          } catch (error: any) {
+            Swal.showValidationMessage(`Error al importar: ${error.message}`);
+            return false;
+          }
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+      }).then((result) => {
+        if (result.isConfirmed) {
+          setForceShowAlabanzas(true);
+          // Pequeño brindis visual de éxito
+          Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            background: isDark ? '#10b981' : '#d1fae5', // Fondo verde éxito
+            color: isDark ? '#ffffff' : '#065f46'
+          }).fire({
+            icon: 'success',
+            title: 'Importación exitosa'
+          });
         }
-      },
-      allowOutsideClick: () => !Swal.isLoading()
-    }).then((result) => {
-      if (result.isConfirmed) {
-        setForceShowAlabanzas(true);
-        // Pequeño brindis visual de éxito
-        Swal.mixin({
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 2000,
-          background: isDark ? '#10b981' : '#d1fae5', // Fondo verde éxito
-          color: isDark ? '#ffffff' : '#065f46'
-        }).fire({
-          icon: 'success',
-          title: 'Importación exitosa'
-        });
-      }
-    });
+      });
+    }, 50); // Timeout para evitar bloqueo de eventos de React/Radix
   };
 
   return (
@@ -267,10 +273,13 @@ export default function PlanificadorItem({
 
               {permisos.mostrarHerramientasEdicion && (
                 <>
-                  <button onClick={() => setIsEditOpen(true)} className="p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-500 dark:text-[#9c8e7c] dark:hover:bg-neutral-800 rounded-lg transition-colors">
+                  <button title="Duplicar actividad" onClick={() => setIsDuplicateOpen(true)} className="p-2 text-gray-400 hover:bg-gray-100 hover:text-green-500 dark:text-[#9c8e7c] dark:hover:bg-neutral-800 rounded-lg transition-colors">
+                    <Copy size={18} />
+                  </button>
+                  <button title="Editar actividad" onClick={() => setIsEditOpen(true)} className="p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-500 dark:text-[#9c8e7c] dark:hover:bg-neutral-800 rounded-lg transition-colors">
                     <Edit2 size={18} />
                   </button>
-                  <button onClick={acciones.eliminarActividad} className="p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:text-[#9c8e7c] dark:hover:bg-red-900/20 dark:hover:text-red-400 rounded-lg transition-colors">
+                  <button title="Eliminar actividad" onClick={acciones.eliminarActividad} className="p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:text-[#9c8e7c] dark:hover:bg-red-900/20 dark:hover:text-red-400 rounded-lg transition-colors">
                     <Trash2 size={18} />
                   </button>
                 </>
@@ -309,13 +318,25 @@ export default function PlanificadorItem({
                 </p>
               )}
 
-              {(checklistSeguro.length > 0 || permisos.puedeEditar) && (
+              {(planificador.status === 'reunion' ? checklistSeguro.length > 0 : (checklistSeguro.length > 0 || permisos.puedeEditar)) && (
                 <PlanificadorChecklist
                   planificadorId={planificador.id}
                   checklist={checklistSeguro}
                   readOnly={!puedeHacerCheck}
                   puedeEditarEstructura={permisos.puedeEditar}
                 />
+              )}
+
+              {planificador.status === 'reunion' && (
+                <div className="mt-2 animate-in fade-in slide-in-from-top-2">
+                  <GestorNotas
+                    actividadId={planificador.id}
+                    notasIniciales={notasSeguras}
+                    usuarios={usuarios}
+                    readonly={!puedeGestionarContenido}
+                    usuarioActualId={usuarioActualId}
+                  />
+                </div>
               )}
 
               {puedeGestionarContenido && (!showFiles || !showVideos || !showDrive || !showDones) && (
@@ -617,6 +638,21 @@ export default function PlanificadorItem({
           modulo={modulo}
           tipoVista={tipoVista}
           departamentosEquipo={departamentosEquipo}
+        />
+      )}
+
+      {isDuplicateOpen && (
+        <NuevoPlanificador
+          isOpen={isDuplicateOpen}
+          onClose={() => setIsDuplicateOpen(false)}
+          usuarios={usuarios}
+          usuarioActualId={usuarioActualId}
+          planificadorEditar={planificador}
+          isJefe={isJefe}
+          modulo={modulo}
+          tipoVista={tipoVista}
+          departamentosEquipo={departamentosEquipo}
+          isDuplicating={true}
         />
       )}
     </>

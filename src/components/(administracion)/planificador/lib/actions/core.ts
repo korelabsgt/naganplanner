@@ -142,6 +142,7 @@ export async function obtenerDatosPlanificador(
         ubicacion
       ),
       act_actividades_alabanzas (
+        id,
         alabanza_id,
         id_director,
         observaciones,
@@ -186,11 +187,15 @@ export async function obtenerDatosPlanificador(
       const directorPerfil = rel.id_director ? perfilesMap.get(rel.id_director) : null;
       return {
         ...dbSong,
+        rel_id: rel.id, // Guardamos el ID de la relación por si acaso
         director_id: rel.id_director,
         director_nombre: directorPerfil?.nombre || null,
         observaciones: rel.observaciones || dbSong.observaciones || null
       };
-    }).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre));
+    }).sort((a: any, b: any) => {
+      if (a.rel_id && b.rel_id) return a.rel_id - b.rel_id;
+      return 0;
+    });
 
     return {
       ...act,

@@ -100,12 +100,18 @@ export const planificadorSchema = z.object({
     id: z.string().uuid(),
     nombre: z.string(),
     tipo: z.string(),
-    tonalidad: z.string().nullable().optional()
+    tonalidad: z.string().nullable().optional(),
+    estado: z.string().nullable().optional(),
+    director_id: z.string().nullable().optional(),
+    director_nombre: z.string().nullable().optional(),
+    observaciones: z.string().nullable().optional(),
   })).nullable().optional().default([]),
   
   dones_espirituales: z.array(donEspiritualSchema).nullable().optional().default([]),
   
   notas_reunion: z.array(notaReunionSchema).nullable().optional().default([]),
+
+  group_id: z.string().uuid().nullable().optional(),
 
   creator: z.object({
     nombre: z.string()
@@ -131,6 +137,7 @@ export const planificadorFormSchema = z.object({
   status: z.string().min(1, "El tipo de servicio es requerido").default('servicio'),
 
   modulo: z.string().optional(),
+  group_id: z.string().uuid().nullable().optional(),
   checklist: z.array(checklistItemSchema).optional().default([]),
   
   videos_url: z.array(videoSchema).optional().default([]),

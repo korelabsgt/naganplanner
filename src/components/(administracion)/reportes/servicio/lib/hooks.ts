@@ -12,16 +12,31 @@ import {
   generarReporteServicio,
   obtenerAjustesGlobales,
   guardarAjustesGlobales,
+  obtenerPlantillasServicio,
+  guardarPlantillaServicio,
+  eliminarPlantillaServicio,
 } from './actions';
 
-import { ConfigProgramaForm, ConfigProgramaServicio, ReporteItem, AjustesGlobales, AjustesGlobalesForm } from './zod';
+import { 
+  ConfigProgramaForm, 
+  ConfigProgramaServicio, 
+  ReporteItem, 
+  AjustesGlobales, 
+  AjustesGlobalesForm,
+  PlantillaServicio,
+  PlantillaServicioForm
+} from './zod';
 
 // =========================================================================
 // QUERY KEYS
 // =========================================================================
 
 const CONFIG_KEYS = {
-  all: ['config-programa-servicio'],
+  all: (plantillaId?: string) => ['config-programa-servicio', plantillaId ?? 'default'],
+};
+
+const PLANTILLAS_KEYS = {
+  all: ['plantillas-servicio'],
 };
 
 const AJUSTES_KEYS = {
@@ -29,19 +44,31 @@ const AJUSTES_KEYS = {
 };
 
 const REPORTE_KEYS = {
-  byFecha: (fecha: string) => ['reporte-servicio', fecha],
+  byFechaYPlantilla: (fecha: string, plantillaId?: string | null) => [
+    'reporte-servicio',
+    fecha,
+    plantillaId ?? 'default',
+  ],
 };
 
 // =========================================================================
-// 1. HOOK DE CONFIGURACIÓN (LECTURA)
+// 1. HOOKS DE LECTURA
 // =========================================================================
 
-export const useConfigPrograma = (initialData?: ConfigProgramaServicio[]) => {
+export const usePlantillasServicio = () => {
   return useQuery({
-    queryKey: CONFIG_KEYS.all,
-    queryFn: obtenerConfigPrograma,
+    queryKey: PLANTILLAS_KEYS.all,
+    queryFn: obtenerPlantillasServicio,
+    staleTime: 1000 * 60 * 5, // 5 min
+  });
+};
+
+export const useConfigPrograma = (plantillaId?: string, initialData?: ConfigProgramaServicio[]) => {
+  return useQuery({
+    queryKey: CONFIG_KEYS.all(plantillaId),
+    queryFn: () => obtenerConfigPrograma(plantillaId),
     initialData,
-    staleTime: 1000 * 60 * 10, // 10 min
+    staleTime: 1000 * 60 * 5, // 5 min
   });
 };
 
@@ -57,13 +84,39 @@ export const useAjustesGlobales = () => {
 // 2. HOOK DE MUTACIONES (CRUD)
 // =========================================================================
 
-export const useConfigProgramaMutaciones = () => {
+export const usePlantillasServicioMutaciones = () => {
   const queryClient = useQueryClient();
-  const invalidar = () => queryClient.invalidateQueries({ queryKey: CONFIG_KEYS.all });
+  const invalidar = () => {
+    queryClient.invalidateQueries({ queryKey: PLANTILLAS_KEYS.all });
+  };
+
+  const guardar = useMutation({
+    mutationFn: ({ data, id }: { data: PlantillaServicioForm; id?: string }) =>
+      guardarPlantillaServicio(data, id),
+    onSuccess: invalidar,
+  });
+
+  const eliminar = useMutation({
+    mutationFn: (id: string) => eliminarPlantillaServicio(id),
+    onSuccess: invalidar,
+  });
+
+  return {
+    guardar,
+    eliminar,
+    isLoading: guardar.isPending || eliminar.isPending,
+  };
+};
+
+export const useConfigProgramaMutaciones = (plantillaId?: string) => {
+  const queryClient = useQueryClient();
+  const invalidar = () => {
+    queryClient.invalidateQueries({ queryKey: CONFIG_KEYS.all(plantillaId) });
+  };
 
   const guardar = useMutation({
     mutationFn: ({ data, id }: { data: ConfigProgramaForm; id?: string }) =>
-      guardarConfigPrograma(data, id),
+      guardarConfigPrograma({ ...data, plantilla_id: plantillaId }, id),
     onSuccess: invalidar,
   });
 
@@ -104,10 +157,10 @@ export const useAjustesGlobalesMutaciones = () => {
 // 3. HOOK DE GENERACIÓN DEL REPORTE
 // =========================================================================
 
-export const useReporteServicio = (fechaHora: string | null) => {
+export const useReporteServicio = (fechaHora: string | null, plantillaId?: string | null) => {
   return useQuery({
-    queryKey: REPORTE_KEYS.byFecha(fechaHora ?? ''),
-    queryFn: () => generarReporteServicio(fechaHora!),
+    queryKey: REPORTE_KEYS.byFechaYPlantilla(fechaHora ?? '', plantillaId),
+    queryFn: () => generarReporteServicio(fechaHora!, plantillaId),
     enabled: !!fechaHora,
     staleTime: 1000 * 60 * 5,
   });
@@ -126,8 +179,8 @@ const swalBaseStyles = {
     'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-neutral-700 font-bold rounded-xl px-6 py-2.5 transition-all',
 };
 
-export const useConfigProgramaLogic = () => {
-  const { eliminar, guardar, reordenar, isLoading } = useConfigProgramaMutaciones();
+export const useConfigProgramaLogic = (plantillaId?: string) => {
+  const { eliminar, guardar, reordenar, isLoading } = useConfigProgramaMutaciones(plantillaId);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {

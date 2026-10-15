@@ -1,8 +1,11 @@
-import { obtenerConfigPrograma } from './lib/actions';
+import { obtenerConfigPrograma, obtenerPlantillasServicio } from './lib/actions';
 import ServicioList from './ServicioList';
 
 export default async function GestorServicio() {
-  const configInicial = await obtenerConfigPrograma();
+  const [configInicial, plantillasIniciales] = await Promise.all([
+    obtenerConfigPrograma(),
+    obtenerPlantillasServicio(),
+  ]);
 
   if (configInicial === null) {
     return (
@@ -19,7 +22,7 @@ export default async function GestorServicio() {
 
   return (
     <div className="w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
-      <ServicioList initialConfig={configInicial} />
+      <ServicioList initialConfig={configInicial} initialPlantillas={plantillasIniciales} />
     </div>
   );
 }

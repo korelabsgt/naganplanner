@@ -32,6 +32,8 @@ export const actividadSchema = z.object({
   assigned_to: z.string().uuid().nullable(),
   created_by: z.string().uuid().nullable(),
 
+  group_id: z.string().uuid().nullable().optional(),
+
   assignee: z.object({
     nombre: z.string(),
     avatar_url: z.string().optional().nullable()
@@ -48,6 +50,7 @@ export const actividadFormSchema = z.object({
   description: z.string().optional(),
   due_date: z.string().refine((date) => date !== "", { message: "La fecha es requerida" }),
   assigned_to: z.string().uuid({ message: "Debes asignar un responsable" }),
+  group_id: z.string().uuid().nullable().optional(),
   checklist: z.array(checklistItemSchema).optional(),
 });
 

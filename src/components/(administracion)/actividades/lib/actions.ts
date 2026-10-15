@@ -203,6 +203,7 @@ export async function guardarActividad(data: ActividadForm, idEdicion?: string) 
     due_date: fechaVencimiento,
     assigned_to: parsed.data.assigned_to,
     checklist: parsed.data.checklist || [],
+    ...(parsed.data.group_id !== undefined ? { group_id: parsed.data.group_id } : {})
   };
 
   if (idEdicion) {

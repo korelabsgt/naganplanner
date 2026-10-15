@@ -17,6 +17,7 @@ import {
   DialogPortal,
 } from "@/components/ui/dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import Swal from 'sweetalert2';
 
@@ -33,6 +34,7 @@ interface Song {
   nombre: string;
   tipo: string;
   tonalidad?: string;
+  estado?: string;
 }
 
 interface Props {
@@ -45,6 +47,7 @@ export default function GestorAlabanzaActividad({ actividadId, alabanzasIniciale
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
 
   const { sincronizarRepertorio } = usePlanificadorMutations();
   const linkedSongs = alabanzasIniciales || [];
@@ -57,6 +60,12 @@ export default function GestorAlabanzaActividad({ actividadId, alabanzasIniciale
       setLocalSelectedIds(new Set(linkedSongs.map(s => s.id)));
     }
   }, [isPickerOpen, linkedSongs]);
+
+  // Si los cantos actuales ya estaban publicados previamente
+  const yaEstaPublicado = useMemo(() => {
+    if (linkedSongs.length === 0) return false;
+    return linkedSongs.every(s => s.estado === 'publicado');
+  }, [linkedSongs]);
 
   // 1. Obtener canciones del banco central
   const { data: banco = [], isLoading: loadingBanco } = useQuery({
@@ -84,28 +93,27 @@ export default function GestorAlabanzaActividad({ actividadId, alabanzasIniciale
     setLocalSelectedIds(nextIds);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (modo: 'borrador' | 'publicado' = 'borrador') => {
     try {
       await sincronizarRepertorio.mutateAsync({ 
         id: actividadId, 
-        alabanzasIds: Array.from(localSelectedIds) 
+        alabanzasIds: Array.from(localSelectedIds),
+        estado: modo
       });
       setIsPickerOpen(false);
       Swal.fire({ 
         toast: true, 
         position: 'top-end', 
         icon: 'success', 
-        title: 'Repertorio guardado', 
+        title: modo === 'borrador' ? 'Guardado en preparación (Borrador)' : 'Repertorio publicado y notificado', 
         showConfirmButton: false, 
-        timer: 2000,
-        target: '#modal-catalogo-alabanzas'
+        timer: 2000
       });
     } catch (e: any) {
       Swal.fire({
         title: 'Error', 
         text: e.message, 
-        icon: 'error',
-        target: '#modal-catalogo-alabanzas'
+        icon: 'error'
       });
     }
   };
@@ -116,11 +124,11 @@ export default function GestorAlabanzaActividad({ actividadId, alabanzasIniciale
     <>
       <button 
         onClick={() => setIsPickerOpen(true)}
-        className="w-full sm:w-auto"
+        className="w-full flex-1"
       >
-        <div className="group flex items-center justify-center gap-2 px-4 py-2 sm:py-3 rounded-xl border border-dashed border-gray-300 dark:border-[#2a2624] hover:border-[#d6a738] dark:hover:border-[#d6a738] hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-all duration-200 active:scale-95 hover:-translate-y-0.5 hover:shadow-sm">
-           <Music size={16} className="text-gray-400 group-hover:text-[#d6a738] transition-colors group-hover:scale-110 sm:w-[18px] sm:h-[18px]" />
-           <span className="text-[10px] sm:text-sm font-bold text-gray-500 dark:text-gray-400 group-hover:text-[#d6a738] dark:group-hover:text-[#d6a738]">
+        <div className="w-full h-10 group flex items-center justify-center gap-2 px-3 rounded-xl border border-dashed border-gray-300 dark:border-[#2a2624] hover:border-[#d6a738] dark:hover:border-[#d6a738] hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-all duration-200 active:scale-95 shadow-sm">
+           <Music size={15} className="text-gray-400 group-hover:text-[#d6a738] transition-colors group-hover:scale-110 shrink-0" />
+           <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 group-hover:text-[#d6a738] dark:group-hover:text-[#d6a738] uppercase tracking-wider truncate">
              {linkedSongs.length > 0 ? `Editar Selección (${linkedSongs.length})` : 'Añadir Repertorio'}
            </span>
         </div>
@@ -177,18 +185,57 @@ export default function GestorAlabanzaActividad({ actividadId, alabanzasIniciale
                     className="w-full pl-12 pr-4 py-3 bg-white dark:bg-neutral-900/50 border border-[#e5e5e5] dark:border-neutral-800 focus:border-[#d6a738]/50 rounded-xl text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-[#d6a738]/10 text-[#4a3f36] dark:text-white placeholder:text-[#847563] dark:placeholder:text-gray-600 transition-all"
                    />
                 </div>
-                <div className="relative min-w-[200px]">
-                   <Filter size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#847563] dark:text-gray-500" />
-                   <select 
-                      value={filtroTipo}
-                      onChange={e => setFiltroTipo(e.target.value)}
-                      className="w-full pl-10 pr-8 py-3 bg-white dark:bg-neutral-900/50 border border-[#e5e5e5] dark:border-neutral-800 focus:border-[#d6a738]/50 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer appearance-none shadow-sm focus:ring-2 focus:ring-[#d6a738]/10 text-[#4a3f36] dark:text-white transition-all"
-                   >
-                      <option value="" className="bg-white dark:bg-[#0a0a0b]">TODOS LOS TIPOS</option>
-                      {TIPOS_ALABANZA.map(t => <option key={t} value={t} className="bg-white dark:bg-[#0a0a0b]">{t.toUpperCase()}</option>)}
-                   </select>
-                   <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#d6a738] pointer-events-none" />
-                </div>
+                 <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
+                    <PopoverTrigger asChild>
+                       <button
+                          type="button"
+                          className="w-full sm:w-[220px] h-[48px] px-4 bg-white dark:bg-neutral-900/50 border border-[#e5e5e5] dark:border-neutral-800 hover:border-[#d6a738]/50 rounded-xl flex items-center justify-between gap-2 shadow-sm transition-all text-left outline-none focus:ring-2 focus:ring-[#d6a738]/10 cursor-pointer"
+                       >
+                          <div className="flex items-center gap-2 min-w-0">
+                             <Filter size={16} className="text-[#847563] dark:text-gray-500 shrink-0" />
+                             <span className="text-[10px] font-black uppercase tracking-widest text-[#4a3f36] dark:text-white truncate">
+                                {filtroTipo ? filtroTipo.toUpperCase() : 'TODOS LOS TIPOS'}
+                             </span>
+                          </div>
+                          <ChevronDown size={14} className="text-[#d6a738] shrink-0 opacity-70" />
+                       </button>
+                    </PopoverTrigger>
+
+                    <PopoverContent
+                       align="center"
+                       side="bottom"
+                       sideOffset={8}
+                       className="w-56 p-2 bg-white dark:bg-[#131211] border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-2xl z-[150]"
+                    >
+                       <div className="flex flex-col gap-1 max-h-56 overflow-y-auto custom-scrollbar">
+                          <button
+                             type="button"
+                             onClick={() => { setFiltroTipo(''); setIsFilterPopoverOpen(false); }}
+                             className={`text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
+                                filtroTipo === ''
+                                   ? 'bg-[#d6a738]/10 text-[#d6a738] font-bold'
+                                   : 'hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300'
+                             }`}
+                          >
+                             TODOS LOS TIPOS
+                          </button>
+                          {TIPOS_ALABANZA.map(t => (
+                             <button
+                                key={t}
+                                type="button"
+                                onClick={() => { setFiltroTipo(t); setIsFilterPopoverOpen(false); }}
+                                className={`text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
+                                   filtroTipo === t
+                                      ? 'bg-[#d6a738]/10 text-[#d6a738] font-bold'
+                                      : 'hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300'
+                                }`}
+                             >
+                                {t.toUpperCase()}
+                             </button>
+                          ))}
+                       </div>
+                    </PopoverContent>
+                 </Popover>
              </div>
           </div>
 
@@ -247,15 +294,32 @@ export default function GestorAlabanzaActividad({ actividadId, alabanzasIniciale
              )}
           </div>
           
-           <div className="px-4 py-4 sm:px-6 border-t border-[#e5e5e5] dark:border-neutral-800 bg-white dark:bg-[#0a0a0b] flex justify-end">
-              <button 
-                onClick={handleSave}
-                disabled={isPending}
-                className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-[#d6a738] to-[#c08e2a] hover:from-[#c08e2a] hover:to-[#a07621] text-white rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-[#d6a738]/20 disabled:opacity-50"
-              >
-                {isPending && <Loader2 size={16} className="animate-spin" />}
-                Guardar Selección ({localSelectedIds.size})
-              </button>
+           <div className="px-4 py-4 sm:px-6 border-t border-[#e5e5e5] dark:border-neutral-800 bg-white dark:bg-[#0a0a0b] flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                {localSelectedIds.size} {localSelectedIds.size === 1 ? 'canto seleccionado' : 'cantos seleccionados'}
+              </span>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button 
+                  onClick={() => handleSave('borrador')}
+                  disabled={isPending}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3.5 bg-gray-100 hover:bg-gray-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-gray-700 dark:text-gray-200 rounded-2xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50"
+                  title="Guarda los cantos en preparación sin notificar a los músicos"
+                >
+                  {isPending && <Loader2 size={15} className="animate-spin" />}
+                  Guardar Borrador
+                </button>
+
+                <button 
+                  onClick={() => handleSave('publicado')}
+                  disabled={isPending}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-7 py-3.5 bg-gradient-to-r from-[#d6a738] to-[#c08e2a] hover:from-[#c08e2a] hover:to-[#a07621] text-white rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-[#d6a738]/20 disabled:opacity-50"
+                  title="Confirma el repertorio y notifica a los músicos"
+                >
+                  {isPending && <Loader2 size={15} className="animate-spin" />}
+                  Publicar y Notificar
+                </button>
+              </div>
            </div>
            
            <style dangerouslySetInnerHTML={{ __html: `

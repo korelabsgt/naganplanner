@@ -7,6 +7,8 @@ import Swal from 'sweetalert2';
 import {
   obtenerDatosPlanificador,
   guardarPlanificador,
+  guardarPlanificadorGrupo,
+  agregarServicioAGrupo,
   eliminarPlanificador,
   responderInvitacionComision,
   removerMiembroComision,
@@ -26,6 +28,7 @@ import {
   obtenerRolesExistentes,
   obtenerRegistroSustituciones,
   sincronizarRepertorioActividad,
+  publicarRepertorioActividad,
   marcarAsistenciaUbicacion,
   clonarRepertorio,
   guardarDonEspiritual,
@@ -88,6 +91,17 @@ export const usePlanificadorMutations = () => {
   // --- Actividades ---
   const guardar = useMutation({
     mutationFn: ({ data, id }: { data: PlanificadorForm, id?: string }) => guardarPlanificador(data, id),
+    onSuccess: invalidar,
+  });
+
+  const guardarGrupo = useMutation({
+    mutationFn: (servicios: PlanificadorForm[]) => guardarPlanificadorGrupo(servicios),
+    onSuccess: invalidar,
+  });
+
+  const agregarAlGrupo = useMutation({
+    mutationFn: ({ servicio, baseActividadId }: { servicio: PlanificadorForm, baseActividadId: string }) =>
+      agregarServicioAGrupo(servicio, baseActividadId),
     onSuccess: invalidar,
   });
 
@@ -179,7 +193,13 @@ export const usePlanificadorMutations = () => {
   });
 
   const mutationSincronizarRepertorio = useMutation({
-    mutationFn: ({ id, alabanzasIds }: { id: string, alabanzasIds: string[] }) => sincronizarRepertorioActividad(id, alabanzasIds),
+    mutationFn: ({ id, alabanzasIds, estado = 'borrador' }: { id: string, alabanzasIds: string[], estado?: 'borrador' | 'publicado' }) =>
+      sincronizarRepertorioActividad(id, alabanzasIds, estado),
+    onSuccess: invalidar,
+  });
+
+  const mutationPublicarRepertorio = useMutation({
+    mutationFn: (id: string) => publicarRepertorioActividad(id),
     onSuccess: invalidar,
   });
 
@@ -206,6 +226,8 @@ export const usePlanificadorMutations = () => {
 
   return {
     guardar,
+    guardarGrupo,
+    agregarAlGrupo,
     eliminar,
     responderInvitacion,
     darDeBaja,
@@ -219,6 +241,7 @@ export const usePlanificadorMutations = () => {
     borrarDrive: mutationBorrarDrive,
     marcarAsistencia,
     sincronizarRepertorio: mutationSincronizarRepertorio,
+    publicarRepertorio: mutationPublicarRepertorio,
     importarRepertorio: mutationImportarRepertorio,
     agregarDon: mutationAgregarDon,
     borrarDon: mutationBorrarDon,
@@ -227,7 +250,8 @@ export const usePlanificadorMutations = () => {
     toggleNota: mutationToggleNota,
     isLoading: guardar.isPending || eliminar.isPending || responderInvitacion.isPending ||
       darDeBaja.isPending || sustituirMiembro.isPending || updateChecklist.isPending ||
-      mutationAgregarVideo.isPending || mutationAgregarAdjunto.isPending || mutationAgregarDrive.isPending
+      mutationAgregarVideo.isPending || mutationAgregarAdjunto.isPending || mutationAgregarDrive.isPending ||
+      mutationPublicarRepertorio.isPending
   };
 };
 

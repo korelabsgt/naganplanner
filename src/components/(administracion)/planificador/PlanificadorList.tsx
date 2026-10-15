@@ -184,7 +184,13 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
 
     if (expandedId) {
       const planActivo = planificadores.find(p => p.id === expandedId);
-      if (planActivo) listaFinal = [planActivo];
+      if (planActivo) {
+        if (planActivo.group_id) {
+          listaFinal = planificadores.filter(p => p.group_id === planActivo.group_id);
+        } else {
+          listaFinal = [planActivo];
+        }
+      }
     }
 
     const map: Record<string, Planificador[]> = {};
@@ -221,40 +227,90 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
 
     return (
       <div className="space-y-6">
-        {grupos.map(([fecha, planificadoresGrupo]) => (
-          <div key={fecha} className="space-y-3 animate-in fade-in">
-            <h3 className="flex items-center gap-2 text-[11px] font-black text-[#9c8e7c] dark:text-[#847563] uppercase tracking-[0.2em] ml-2">
-              <CalendarIcon size={14} className="text-[#d6a738]" />
-              {getNombreFecha(fecha)}
-              <span className="ml-auto bg-[#faf8f4] dark:bg-neutral-800 text-[#4a3f36] dark:text-[#b9ae9f] px-2 py-0.5 rounded-lg text-[10px] font-bold">
-                {planificadoresGrupo.length}
-              </span>
-            </h3>
+        {grupos.map(([fecha, planificadoresGrupo]) => {
+          // Agrupar actividades que comparten el mismo group_id
+          const itemsUnicos: { principal: Planificador; hermanos: Planificador[] }[] = [];
+          const gruposMap = new Map<string, Planificador[]>();
 
-            <div className="grid grid-cols-1 gap-3">
-              {planificadoresGrupo
-                .sort((a, b) => {
-                  const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
-                  const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
-                  return isProximos ? dateA - dateB : dateB - dateA;
-                })
-                .map((plan) => (
-                  <PlanificadorItem
-                    key={plan.id}
-                    planificador={plan}
-                    usuarios={usuarios}
-                    usuarioActualId={perfil.id}
-                    isExpanded={expandedId === plan.id}
-                    onToggle={() => setExpandedId(expandedId === plan.id ? null : plan.id)}
-                    isJefe={isJefe}
-                    modulo={modulo}
-                    tipoVista={tipoVista}
-                    departamentosEquipo={departamentosEquipo}
-                  />
-                ))}
+          const ordenados = [...planificadoresGrupo].sort((a, b) => {
+            const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+            const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+            return isProximos ? dateA - dateB : dateB - dateA;
+          });
+
+          ordenados.forEach((plan) => {
+            if (plan.group_id) {
+              if (!gruposMap.has(plan.group_id)) {
+                gruposMap.set(plan.group_id, []);
+              }
+              gruposMap.get(plan.group_id)!.push(plan);
+            }
+          });
+
+          const procesadosGrupos = new Set<string>();
+
+          ordenados.forEach((plan) => {
+            if (plan.group_id) {
+              if (!procesadosGrupos.has(plan.group_id)) {
+                procesadosGrupos.add(plan.group_id);
+                // Buscar todos los hermanos del grupo en la lista completa y ordenarlos cronológicamente
+                const todosDelGrupo = planificadores
+                  .filter(p => p.group_id === plan.group_id)
+                  .sort((a, b) => {
+                    const timeA = a.due_date ? new Date(a.due_date).getTime() : 0;
+                    const timeB = b.due_date ? new Date(b.due_date).getTime() : 0;
+                    if (timeA !== timeB) return timeA - timeB;
+                    const cA = (a as any).created_at ? new Date((a as any).created_at).getTime() : 0;
+                    const cB = (b as any).created_at ? new Date((b as any).created_at).getTime() : 0;
+                    return cA - cB;
+                  });
+
+                itemsUnicos.push({
+                  principal: todosDelGrupo[0] || plan,
+                  hermanos: todosDelGrupo.length > 0 ? todosDelGrupo : [plan]
+                });
+              }
+            } else {
+              itemsUnicos.push({
+                principal: plan,
+                hermanos: [plan]
+              });
+            }
+          });
+
+          return (
+            <div key={fecha} className="space-y-3 animate-in fade-in">
+              <h3 className="flex items-center gap-2 text-[11px] font-black text-[#9c8e7c] dark:text-[#847563] uppercase tracking-[0.2em] ml-2">
+                <CalendarIcon size={14} className="text-[#d6a738]" />
+                {getNombreFecha(fecha)}
+                <span className="ml-auto bg-[#faf8f4] dark:bg-neutral-800 text-[#4a3f36] dark:text-[#b9ae9f] px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                  {itemsUnicos.length}
+                </span>
+              </h3>
+
+              <div className="grid grid-cols-1 gap-3">
+                {itemsUnicos.map(({ principal, hermanos }) => {
+                  const estaExpandido = hermanos.some(h => h.id === expandedId);
+                  return (
+                    <PlanificadorItem
+                      key={principal.id}
+                      planificador={principal}
+                      serviciosGrupo={hermanos}
+                      usuarios={usuarios}
+                      usuarioActualId={perfil.id}
+                      isExpanded={estaExpandido}
+                      onToggle={() => setExpandedId(estaExpandido ? null : principal.id)}
+                      isJefe={isJefe}
+                      modulo={modulo}
+                      tipoVista={tipoVista}
+                      departamentosEquipo={departamentosEquipo}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -451,10 +507,20 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
                   return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
                 });
 
-                const count = planificadoresEnMes.filter(p => {
-                  const est = getEstadoCalculado(p.due_date);
-                  return est === estado;
-                }).length;
+                // Contar actividades considerando grupos (un grupo cuenta como 1 sola actividad)
+                const itemsEnEstado = planificadoresEnMes.filter(p => getEstadoCalculado(p.due_date) === estado);
+                const gruposContados = new Set<string>();
+                let count = 0;
+                itemsEnEstado.forEach(p => {
+                  if (p.group_id) {
+                    if (!gruposContados.has(p.group_id)) {
+                      gruposContados.add(p.group_id);
+                      count++;
+                    }
+                  } else {
+                    count++;
+                  }
+                });
 
                 const isActive = filtroEstado === estado;
 
@@ -613,17 +679,19 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
         )}
       </div>
 
-      <NuevoPlanificador
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        usuarios={usuariosParaAsignar}
-        usuarioActualId={perfil.id}
-        isJefe={isJefe}
-        modulo={modulo}
-        tipoVista={tipoVista}
-        departamentosEquipo={departamentosEquipo}
-        tiposServicio={data?.tiposServicio || []}
-      />
+      {isModalOpen && (
+        <NuevoPlanificador
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          usuarios={usuariosParaAsignar}
+          usuarioActualId={perfil.id}
+          isJefe={isJefe}
+          modulo={modulo}
+          tipoVista={tipoVista}
+          departamentosEquipo={departamentosEquipo}
+          tiposServicio={data?.tiposServicio || []}
+        />
+      )}
 
       {/* MODAL DE GESTIÓN (CRUD de equipos) */}
       <GestorEquipos

@@ -1,14 +1,21 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Pencil, ChevronUp, ChevronDown, Save, Loader2, Settings } from 'lucide-react';
-import { ConfigProgramaServicio, ConfigProgramaForm, AjustesGlobalesForm } from '../lib/zod';
-import { useConfigPrograma, useConfigProgramaLogic, useAjustesGlobales, useAjustesGlobalesMutaciones } from '../lib/hooks';
+import { ArrowLeft, Plus, Trash2, Pencil, ChevronUp, ChevronDown, Save, Loader2, Settings, Layers, Check, ChevronsUpDown } from 'lucide-react';
+import { ConfigProgramaServicio, ConfigProgramaForm, AjustesGlobalesForm, PlantillaServicio, PlantillaServicioForm } from '../lib/zod';
+import { 
+  useConfigPrograma, 
+  useConfigProgramaLogic, 
+  useAjustesGlobales, 
+  useAjustesGlobalesMutaciones,
+  usePlantillasServicio,
+  usePlantillasServicioMutaciones 
+} from '../lib/hooks';
 import { useRolesSugeridos } from '../../../planificador/lib/hooks';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Props {
   onBack: () => void;
   initialConfig: ConfigProgramaServicio[];
+  initialPlantillas?: PlantillaServicio[];
 }
 
 const MODULOS_DISPONIBLES = [
@@ -33,9 +40,40 @@ const FORM_VACIO: ConfigProgramaForm = {
   tiempo_minutos: 10,
 };
 
-export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props) {
-  const { data: config } = useConfigPrograma(initialConfig);
-  const { confirmarEliminar, guardarItem, moverOrden, isLoading } = useConfigProgramaLogic();
+export default function VistaConfigurarPrograma({ onBack, initialConfig, initialPlantillas = [] }: Props) {
+  // Manejo de Plantillas
+  const { data: plantillas = initialPlantillas, isLoading: cargandoPlantillas } = usePlantillasServicio();
+  const { guardar: guardarPlantilla, eliminar: eliminarPlantilla } = usePlantillasServicioMutaciones();
+  
+  const [plantillaActivaId, setPlantillaActivaId] = useState<string | undefined>(() => {
+    return initialPlantillas[0]?.id;
+  });
+
+  // Si cargan plantillas y no hay activa, asignar la primera
+  useEffect(() => {
+    if (plantillas.length > 0 && !plantillaActivaId) {
+      setPlantillaActivaId(plantillas[0].id);
+    }
+  }, [plantillas, plantillaActivaId]);
+
+  const plantillaActual = plantillas.find(p => p.id === plantillaActivaId);
+
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isTipoServicioPopoverOpen, setIsTipoServicioPopoverOpen] = useState(false);
+
+  // Estados modal/formulario de Plantilla
+  const [editandoPlantilla, setEditandoPlantilla] = useState(false);
+  const [creandoPlantilla, setCreandoPlantilla] = useState(false);
+  const [formPlantilla, setFormPlantilla] = useState<PlantillaServicioForm>({
+    nombre: '',
+    tipo_servicio: 'servicio',
+    minutos_preparacion_previa: 60,
+    permite_multi_horario: false,
+  });
+
+  // Configuración de bloques scoped a la plantilla activa (no pasar initialConfig global para que cargue los puntos de la plantilla)
+  const { data: config } = useConfigPrograma(plantillaActivaId);
+  const { confirmarEliminar, guardarItem, moverOrden, notificar, isLoading } = useConfigProgramaLogic(plantillaActivaId);
   const { data: rolesSugeridos = [] } = useRolesSugeridos();
 
   const [modoForm, setModoForm] = useState<'nuevo' | 'editar' | null>(null);
@@ -43,13 +81,12 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props
   const [form, setForm] = useState<ConfigProgramaForm>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
 
-  // Ajustes Globales
+  // Ajustes Globales (Nombre de iglesia)
   const { data: ajustes, isLoading: cargandoAjustes } = useAjustesGlobales();
   const { guardar: guardarAjustes, isLoading: guardandoAjustes } = useAjustesGlobalesMutaciones();
   const [editandoAjustes, setEditandoAjustes] = useState(false);
   const [formAjustes, setFormAjustes] = useState<AjustesGlobalesForm>({ nombre_iglesia: '', minutos_preparacion_previa: 60 });
 
-  // Sincronizar estado de ajustes cuando carguen
   useEffect(() => {
     if (ajustes && !editandoAjustes) {
       setFormAjustes({
@@ -64,6 +101,61 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props
     if (!formAjustes.nombre_iglesia.trim()) return;
     await guardarAjustes.mutateAsync(formAjustes);
     setEditandoAjustes(false);
+  };
+
+  const handleCrearPlantilla = () => {
+    setFormPlantilla({
+      nombre: '',
+      tipo_servicio: 'servicio',
+      minutos_preparacion_previa: 60,
+      permite_multi_horario: false,
+    });
+    setCreandoPlantilla(true);
+  };
+
+  const handleEditarPlantilla = (p: PlantillaServicio) => {
+    setFormPlantilla({
+      nombre: p.nombre,
+      tipo_servicio: p.tipo_servicio || 'servicio',
+      minutos_preparacion_previa: p.minutos_preparacion_previa || 0,
+      permite_multi_horario: p.permite_multi_horario || false,
+    });
+    setEditandoPlantilla(true);
+  };
+
+  const handleGuardarPlantilla = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formPlantilla.nombre.trim()) return;
+    
+    const res = await guardarPlantilla.mutateAsync({
+      data: formPlantilla,
+      id: editandoPlantilla ? plantillaActivaId : undefined,
+    });
+
+    if (res.ok && res.data) {
+      setPlantillaActivaId(res.data.id);
+      setCreandoPlantilla(false);
+      setEditandoPlantilla(false);
+      notificar('success', editandoPlantilla ? 'Plantilla actualizada' : 'Plantilla creada');
+    } else {
+      notificar('error', 'Error al guardar plantilla', res.error);
+    }
+  };
+
+  const handleEliminarPlantilla = async () => {
+    if (!plantillaActual) return;
+    if (plantillas.length <= 1) {
+      notificar('warning', 'No puedes eliminar la única plantilla existente');
+      return;
+    }
+    const res = await eliminarPlantilla.mutateAsync(plantillaActual.id);
+    if (res.ok) {
+      const restante = plantillas.find(p => p.id !== plantillaActual.id);
+      setPlantillaActivaId(restante?.id);
+      notificar('success', 'Plantilla eliminada');
+    } else {
+      notificar('error', 'Error al eliminar', res.error);
+    }
   };
 
   // Aplanar árbol para mostrar en lista con indentación
@@ -83,6 +175,7 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props
       : itemsRaiz;
     setForm({
       ...FORM_VACIO,
+      plantilla_id: plantillaActivaId,
       parent_id: parentId ?? null,
       orden: hermanos.length + 1,
     });
@@ -92,6 +185,7 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props
 
   const abrirEditar = (item: ConfigProgramaServicio) => {
     setForm({
+      plantilla_id: item.plantilla_id ?? plantillaActivaId,
       parent_id: item.parent_id ?? null,
       orden: item.orden,
       tipo_elemento: item.tipo_elemento,
@@ -113,13 +207,18 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props
     if (!form.nombre_mostrar.trim()) return;
     setGuardando(true);
 
-    const ok = await guardarItem(form, itemEditando?.id);
+    const payload = {
+      ...form,
+      plantilla_id: plantillaActivaId,
+    };
+
+    const ok = await guardarItem(payload, itemEditando?.id);
     setGuardando(false);
     if (ok) cancelarForm();
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="w-full max-w-3xl mx-auto space-y-6 pb-28 animate-in fade-in slide-in-from-bottom-4 duration-300">
       
       {/* Header con botón regresar */}
       <div className="flex items-center gap-4">
@@ -132,12 +231,221 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig }: Props
         </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Configuración de la plantilla
+            Configuración de plantillas
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Define el orden y los tiempos de cada bloque del programa
+            Gestiona plantillas independientes para cada tipo de servicio o culto
           </p>
         </div>
+      </div>
+
+      {/* SECCIÓN: Selector y Gestor de Plantillas */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#F8AC32]" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+              Plantilla Activa
+            </h2>
+          </div>
+          <button
+            onClick={handleCrearPlantilla}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#F8AC32] hover:bg-[#E09827] text-white rounded-xl transition-all shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Nueva Plantilla
+          </button>
+        </div>
+
+        {/* Formulario Crear/Editar Plantilla */}
+        {(creandoPlantilla || editandoPlantilla) ? (
+          <form onSubmit={handleGuardarPlantilla} className="p-4 bg-gray-50 dark:bg-neutral-950/60 rounded-xl border border-gray-200 dark:border-neutral-800 space-y-4">
+            <h3 className="text-xs font-bold uppercase text-gray-700 dark:text-gray-300">
+              {editandoPlantilla ? 'Editar Datos de Plantilla' : 'Crear Nueva Plantilla'}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Nombre</label>
+                <input
+                  type="text"
+                  required
+                  value={formPlantilla.nombre}
+                  onChange={e => setFormPlantilla({ ...formPlantilla, nombre: e.target.value })}
+                  placeholder="Ej: Servicio de Jóvenes"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg outline-none focus:ring-2 focus:ring-[#F8AC32]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Tipo de Servicio Vinculado</label>
+                <Popover open={isTipoServicioPopoverOpen} onOpenChange={setIsTipoServicioPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg outline-none focus:ring-2 focus:ring-[#F8AC32] hover:border-[#F8AC32]/50 transition-all text-left font-medium"
+                    >
+                      <span>
+                        {formPlantilla.tipo_servicio === 'servicio' && 'Servicio / Culto'}
+                        {formPlantilla.tipo_servicio === 'ensayo' && 'Ensayo'}
+                        {formPlantilla.tipo_servicio === 'servicio_especial' && 'Servicio Especial'}
+                        {formPlantilla.tipo_servicio === 'reunion' && 'Reunión'}
+                        {!['servicio', 'ensayo', 'servicio_especial', 'reunion'].includes(formPlantilla.tipo_servicio || '') && 'Servicio / Culto'}
+                      </span>
+                      <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    align="center"
+                    side="bottom"
+                    sideOffset={6}
+                    className="w-[var(--radix-popover-trigger-width)] max-w-none p-1.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl shadow-xl z-50"
+                  >
+                    <div className="flex flex-col gap-1">
+                      {[
+                        { value: 'servicio', label: 'Servicio / Culto' },
+                        { value: 'ensayo', label: 'Ensayo' },
+                        { value: 'servicio_especial', label: 'Servicio Especial' },
+                        { value: 'reunion', label: 'Reunión' },
+                      ].map((item) => {
+                        const isSelected = (formPlantilla.tipo_servicio || 'servicio') === item.value;
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => {
+                              setFormPlantilla({ ...formPlantilla, tipo_servicio: item.value });
+                              setIsTipoServicioPopoverOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs sm:text-sm text-left transition-all ${
+                              isSelected
+                                ? 'bg-[#F8AC32]/15 text-[#E09827] dark:text-[#F8AC32] font-bold'
+                                : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'
+                            }`}
+                          >
+                            <span>{item.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#F8AC32] shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Retraso / Preparación Previa (min)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formPlantilla.minutos_preparacion_previa}
+                  onChange={e => setFormPlantilla({ ...formPlantilla, minutos_preparacion_previa: Number(e.target.value) })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg outline-none focus:ring-2 focus:ring-[#F8AC32]"
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="multiHorario"
+                  checked={formPlantilla.permite_multi_horario}
+                  onChange={e => setFormPlantilla({ ...formPlantilla, permite_multi_horario: e.target.checked })}
+                  className="rounded border-gray-300 text-[#F8AC32] focus:ring-[#F8AC32]"
+                />
+                <label htmlFor="multiHorario" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Permitir múltiples horarios consecutivos
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setCreandoPlantilla(false); setEditandoPlantilla(false); }}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 text-xs font-semibold bg-[#F8AC32] hover:bg-[#E09827] text-white rounded-lg flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Guardar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="w-full">
+              <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-950 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F8AC32] hover:border-[#F8AC32]/50 transition-all text-left"
+                  >
+                    <span className="truncate">
+                      {plantillaActual 
+                        ? `${plantillaActual.nombre} (${plantillaActual.minutos_preparacion_previa} min previos)`
+                        : 'Seleccionar plantilla...'}
+                    </span>
+                    <ChevronsUpDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  align="center" 
+                  side="bottom"
+                  sideOffset={6}
+                  className="w-[var(--radix-popover-trigger-width)] max-w-none p-1.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-xl z-50"
+                >
+                  <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+                    {plantillas.map(p => {
+                      const isSelected = p.id === plantillaActivaId;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setPlantillaActivaId(p.id);
+                            setIsPopoverOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm text-left transition-all ${
+                            isSelected
+                              ? 'bg-[#F8AC32]/15 text-[#E09827] dark:text-[#F8AC32] font-bold'
+                              : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className="truncate">{p.nombre}</span>
+                            <span className="text-[10px] text-gray-400 font-normal">
+                              {p.minutos_preparacion_previa} min preparación {p.permite_multi_horario ? '· Multi-horario' : ''}
+                            </span>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 shrink-0 text-[#F8AC32]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {plantillaActual && (
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => handleEditarPlantilla(plantillaActual)}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 rounded-xl flex items-center gap-1.5 transition-all"
+                  title="Editar parámetros de la plantilla"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Editar
+                </button>
+                <button
+                  onClick={handleEliminarPlantilla}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 rounded-xl flex items-center gap-1.5 transition-all"
+                  title="Eliminar esta plantilla"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Eliminar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Ajustes Globales */}

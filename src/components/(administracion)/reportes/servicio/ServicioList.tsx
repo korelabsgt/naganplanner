@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, FileText, Calendar, Clock, Eye, Loader2, AlertCircle, Sparkles } from 'lucide-react';
-import { ConfigProgramaServicio } from './lib/zod';
-import { useReporteServicio } from './lib/hooks';
+import { Settings, FileText, Calendar, Clock, Eye, Loader2, AlertCircle, Sparkles, Layers, Check, ChevronsUpDown } from 'lucide-react';
+import { ConfigProgramaServicio, PlantillaServicio } from './lib/zod';
+import { useReporteServicio, usePlantillasServicio } from './lib/hooks';
 import ServicioItem from './ServicioItem';
 import VistaConfigurarPrograma from './modals/VistaConfigurarPrograma';
 import VistaPreviaImpresion from './modals/VistaPreviaImpresion';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Props {
   initialConfig: ConfigProgramaServicio[];
+  initialPlantillas?: PlantillaServicio[];
 }
 
 function formatearFechaLabel(isoString: string): string {
@@ -26,7 +28,18 @@ function formatearFechaLabel(isoString: string): string {
   }
 }
 
-export default function ServicioList({ initialConfig }: Props) {
+export default function ServicioList({ initialConfig, initialPlantillas = [] }: Props) {
+  const { data: plantillas = initialPlantillas } = usePlantillasServicio();
+  const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<string>(() => {
+    return initialPlantillas[0]?.id || '';
+  });
+
+  useEffect(() => {
+    if (plantillas.length > 0 && !plantillaSeleccionada) {
+      setPlantillaSeleccionada(plantillas[0].id);
+    }
+  }, [plantillas, plantillaSeleccionada]);
+
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('00');
   const [minuto, setMinuto] = useState('00');
@@ -34,12 +47,12 @@ export default function ServicioList({ initialConfig }: Props) {
   const [fechaBuscada, setFechaBuscada] = useState<string | null>(null);
   const [vistaActual, setVistaActual] = useState<'reporte' | 'ajustes' | 'impresion'>('reporte');
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [isPlantillaPopoverOpen, setIsPlantillaPopoverOpen] = useState(false);
 
-  useEffect(() => {
-    // Ya no se requiere inicializar la fecha; usamos el truco de type="text"
-  }, []);
-
-  const { data: reporte, isLoading, isError } = useReporteServicio(fechaBuscada);
+  const { data: reporte, isLoading, isError } = useReporteServicio(
+    fechaBuscada, 
+    plantillaSeleccionada || null
+  );
 
   const handleBuscar = () => {
     if (!fecha) return;
@@ -66,7 +79,7 @@ export default function ServicioList({ initialConfig }: Props) {
   return (
     <>
       {vistaActual === 'reporte' && (
-        <div className="w-full max-w-3xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="w-full max-w-3xl mx-auto space-y-5 pb-28 animate-in fade-in slide-in-from-bottom-4 duration-300">
 
           {/* Encabezado */}
           <div className="flex items-start justify-between gap-4">
@@ -92,13 +105,75 @@ export default function ServicioList({ initialConfig }: Props) {
             </button>
           </div>
 
-          {/* Selector de fecha/hora */}
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-[#F8AC32]" />
-              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                Fecha y hora del servicio
-              </h2>
+          {/* Selector de plantilla y fecha/hora */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-5 shadow-sm space-y-4">
+            
+            {/* Selector de Plantilla */}
+            {plantillas.length > 0 && (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase mb-1.5">
+                  <Layers className="w-3.5 h-3.5 text-[#F8AC32]" />
+                  Plantilla a utilizar
+                </label>
+                <Popover open={isPlantillaPopoverOpen} onOpenChange={setIsPlantillaPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-950 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F8AC32] hover:border-[#F8AC32]/50 transition-all text-left"
+                    >
+                      <span className="truncate">
+                        {plantillas.find(p => p.id === plantillaSeleccionada)?.nombre || 'Seleccionar plantilla...'}
+                        {plantillas.find(p => p.id === plantillaSeleccionada)?.permite_multi_horario ? ' (Multi-horario consecutivo)' : ''}
+                      </span>
+                      <ChevronsUpDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    align="center" 
+                    side="bottom"
+                    sideOffset={6}
+                    className="w-[var(--radix-popover-trigger-width)] max-w-none p-1.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-xl z-50"
+                  >
+                    <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+                      {plantillas.map(p => {
+                        const isSelected = p.id === plantillaSeleccionada;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setPlantillaSeleccionada(p.id);
+                              setIsPlantillaPopoverOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm text-left transition-all ${
+                              isSelected
+                                ? 'bg-[#F8AC32]/15 text-[#E09827] dark:text-[#F8AC32] font-bold'
+                                : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'
+                            }`}
+                          >
+                            <div className="flex flex-col min-w-0 pr-2">
+                              <span className="truncate">{p.nombre}</span>
+                              <span className="text-[10px] text-gray-400 font-normal">
+                                {p.minutos_preparacion_previa} min preparación {p.permite_multi_horario ? '· Multi-horario consecutivo' : ''}
+                              </span>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 shrink-0 text-[#F8AC32]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="w-4 h-4 text-[#F8AC32]" />
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Fecha y hora del servicio (o primer servicio)
+                </h2>
+              </div>
             </div>
             <div className="flex flex-wrap sm:flex-nowrap gap-3">
               <div className="flex-1 flex flex-wrap sm:flex-nowrap gap-2">
@@ -299,6 +374,7 @@ export default function ServicioList({ initialConfig }: Props) {
         <VistaConfigurarPrograma
           onBack={() => setVistaActual('reporte')}
           initialConfig={initialConfig}
+          initialPlantillas={plantillas}
         />
       )}
 

@@ -18,6 +18,7 @@ interface Song {
   observaciones?: string;
   director_id?: string;
   director_nombre?: string;
+  estado?: string | null;
 }
 
 interface Integrante {
@@ -192,14 +193,20 @@ export default function ModalRepertorioActividad({ isOpen, onClose, songs, activ
                 <Music size={24} className="sm:hidden" />
                 <Music size={28} className="hidden sm:block" />
               </div>
-              <div className="flex flex-col text-left">
-                <DialogTitle className="text-sm sm:text-base font-black text-[#4a3f36] dark:text-white tracking-tight leading-none sm:leading-normal">
+              <div className="flex flex-col text-left min-w-0 flex-1">
+                <DialogTitle className="text-sm sm:text-base font-black text-[#4a3f36] dark:text-white tracking-tight leading-none sm:leading-normal truncate">
                   Repertorio del Servicio
                 </DialogTitle>
-                <div className="flex items-center gap-2 mt-1 sm:mt-1">
-                  <span className="text-[10px] sm:text-xs font-bold text-[#d6a738] bg-[#d6a738]/10 px-2 py-0.5 rounded-full uppercase tracking-widest border border-[#d6a738]/20">
-                    {songs.length} Cantos Programados
+                <div className="flex flex-wrap items-center gap-1.5 mt-1 sm:mt-1.5">
+                  <span className="text-[9px] sm:text-xs font-bold text-[#d6a738] bg-[#d6a738]/10 px-2 py-0.5 rounded-full uppercase tracking-wider border border-[#d6a738]/20 whitespace-nowrap">
+                    <span className="sm:hidden">{songs.length} Cantos</span>
+                    <span className="hidden sm:inline">{songs.length} Cantos Programados</span>
                   </span>
+                  {localSongs.some(s => s.estado === 'borrador') && (
+                    <span className="text-[9px] sm:text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/20 whitespace-nowrap">
+                      En preparación
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

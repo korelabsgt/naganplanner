@@ -110,7 +110,11 @@ export async function obtenerBancoAlabanzas() {
 // GESTIÓN DE ALABANZAS EN ACTIVIDADES
 // ============================================================================
 
-export async function sincronizarRepertorioActividad(actividad_id: string, alabanzas_ids: string[]) {
+export async function sincronizarRepertorioActividad(
+  actividad_id: string,
+  alabanzas_ids: string[],
+  estado: 'borrador' | 'publicado' = 'borrador'
+) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('No autenticado');
@@ -144,7 +148,7 @@ export async function sincronizarRepertorioActividad(actividad_id: string, alaba
   // 1. Obtener el repertorio actual para preservar directores y observaciones
   const { data: repertorioActual } = await supabase
     .from('act_actividades_alabanzas')
-    .select('alabanza_id, id_director, observaciones')
+    .select('alabanza_id, id_director, observaciones, estado')
     .eq('actividad_id', actividad_id);
 
   const mapaRepertorioAnterior = new Map();
@@ -170,7 +174,8 @@ export async function sincronizarRepertorioActividad(actividad_id: string, alaba
         actividad_id,
         alabanza_id: id,
         id_director: previo ? previo.id_director : null,
-        observaciones: previo ? previo.observaciones : null
+        observaciones: previo ? previo.observaciones : null,
+        estado: estado
       };
     });
 
@@ -180,86 +185,136 @@ export async function sincronizarRepertorioActividad(actividad_id: string, alaba
 
     if (insertError) throw new Error(insertError.message);
 
-    // 3. NOTIFICACIONES CONDICIONALES
-    try {
-      // Obtener la fecha de esta actividad
-      const { data: actividadConFecha } = await supabase
-        .from('act_actividades')
-        .select('due_date')
-        .eq('id', actividad_id)
-        .single();
-
-      const fechaDue = actividadConFecha?.due_date;
-      let hayActividadesMismaFecha = false;
-      let encargadosMismaFechaIds: string[] = [];
-
-      if (fechaDue) {
-        const fechaSoloDia = new Date(fechaDue).toISOString().split('T')[0];
-
-        // Buscar otras actividades en la misma fecha
-        const { data: actividadesMismaFecha } = await supabase
-          .from('act_actividades')
-          .select('id')
-          .neq('id', actividad_id)
-          .gte('due_date', `${fechaSoloDia}T00:00:00`)
-          .lte('due_date', `${fechaSoloDia}T23:59:59`);
-
-        if (actividadesMismaFecha && actividadesMismaFecha.length > 0) {
-          hayActividadesMismaFecha = true;
-
-          // Obtener encargados de esas otras actividades
-          const idsOtrasActividades = actividadesMismaFecha.map(a => a.id);
-          const { data: encargadosOtras } = await supabase
-            .from('act_integrantes')
-            .select('usuario_id')
-            .in('actividad_id', idsOtrasActividades)
-            .eq('es_encargado', true);
-
-          encargadosMismaFechaIds = (encargadosOtras || [])
-            .map(e => e.usuario_id)
-            .filter(id => id !== user.id);
-        }
-      }
-
-      // Notificar siempre a los miembros de ESTA actividad
-      const { data: integrantes } = await supabase
-        .from('act_integrantes')
-        .select('usuario_id')
-        .eq('actividad_id', actividad_id);
-
-      const miembrosActividadIds = (integrantes || [])
-        .map(i => i.usuario_id)
-        .filter(id => id !== user.id);
-
-      const pushPayload = {
-        title: "🎵 Repertorio Actualizado",
-        body: `Se ha definido el repertorio para la actividad: ${actividad.title || 'Desconocida'}`,
-        url: "/kore/planificador"
-      };
-
-      const promesas: Promise<any>[] = [];
-
-      // Siempre: notificar a miembros de esta actividad
-      if (miembrosActividadIds.length > 0) {
-        promesas.push(sendPushToUsers(miembrosActividadIds, pushPayload));
-      }
-
-      // Solo si hay actividades en la misma fecha: notificar a roles y encargados de otras actividades
-      if (hayActividadesMismaFecha) {
-        const rolesANotificar = ['lider', 'Líder', 'Lider', 'LIDER', 'admin', 'Admin', 'ADMIN', 'super', 'Super', 'SUPER'];
-        promesas.push(sendPushToRoles(rolesANotificar, pushPayload));
-
-        if (encargadosMismaFechaIds.length > 0) {
-          promesas.push(sendPushToUsers(encargadosMismaFechaIds, pushPayload));
-        }
-      }
-
-      await Promise.all(promesas);
-
-    } catch (err) {
-      console.error("Error enviando notificación push de repertorio:", err);
+    // Solo si se guarda directamente como 'publicado' se envían notificaciones
+    if (estado === 'publicado') {
+      await enviarNotificacionesRepertorio(supabase, user.id, actividad_id, actividad.title);
     }
   }
+
+  revalidatePath('/kore/planificador');
+}
+
+// Función auxiliar para enviar las notificaciones push oficiales
+async function enviarNotificacionesRepertorio(
+  supabase: any,
+  userId: string,
+  actividad_id: string,
+  actividadTitle: string
+) {
+  try {
+    const { data: actividadConFecha } = await supabase
+      .from('act_actividades')
+      .select('due_date')
+      .eq('id', actividad_id)
+      .single();
+
+    const fechaDue = actividadConFecha?.due_date;
+    let hayActividadesMismaFecha = false;
+    let encargadosMismaFechaIds: string[] = [];
+
+    if (fechaDue) {
+      const fechaSoloDia = new Date(fechaDue).toISOString().split('T')[0];
+
+      const { data: actividadesMismaFecha } = await supabase
+        .from('act_actividades')
+        .select('id')
+        .neq('id', actividad_id)
+        .gte('due_date', `${fechaSoloDia}T00:00:00`)
+        .lte('due_date', `${fechaSoloDia}T23:59:59`);
+
+      if (actividadesMismaFecha && actividadesMismaFecha.length > 0) {
+        hayActividadesMismaFecha = true;
+
+        const idsOtrasActividades = actividadesMismaFecha.map((a: any) => a.id);
+        const { data: encargadosOtras } = await supabase
+          .from('act_integrantes')
+          .select('usuario_id')
+          .in('actividad_id', idsOtrasActividades)
+          .eq('es_encargado', true);
+
+        encargadosMismaFechaIds = (encargadosOtras || [])
+          .map((e: any) => e.usuario_id)
+          .filter((id: string) => id !== userId);
+      }
+    }
+
+    const { data: integrantes } = await supabase
+      .from('act_integrantes')
+      .select('usuario_id')
+      .eq('actividad_id', actividad_id);
+
+    const miembrosActividadIds = (integrantes || [])
+      .map((i: any) => i.usuario_id)
+      .filter((id: string) => id !== userId);
+
+    const pushPayload = {
+      title: "🎵 Repertorio Actualizado",
+      body: `Se ha definido el repertorio para la actividad: ${actividadTitle || 'Desconocida'}`,
+      url: "/kore/planificador"
+    };
+
+    const promesas: Promise<any>[] = [];
+
+    if (miembrosActividadIds.length > 0) {
+      promesas.push(sendPushToUsers(miembrosActividadIds, pushPayload));
+    }
+
+    if (hayActividadesMismaFecha) {
+      const rolesANotificar = ['lider', 'Líder', 'Lider', 'LIDER', 'admin', 'Admin', 'ADMIN', 'super', 'Super', 'SUPER'];
+      promesas.push(sendPushToRoles(rolesANotificar, pushPayload));
+
+      if (encargadosMismaFechaIds.length > 0) {
+        promesas.push(sendPushToUsers(encargadosMismaFechaIds, pushPayload));
+      }
+    }
+
+    await Promise.all(promesas);
+  } catch (err) {
+    console.error("Error enviando notificación push de repertorio:", err);
+  }
+}
+
+// Acción dedicada para publicar el repertorio oficial y notificar al equipo
+export async function publicarRepertorioActividad(actividad_id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+
+  const isJefe = await checkIsJefe(supabase, user.id);
+
+  const { data: actividad } = await supabase
+    .from('act_actividades')
+    .select('created_by, title')
+    .eq('id', actividad_id)
+    .single();
+
+  if (!actividad) throw new Error('Actividad no encontrada');
+
+  const { data: registroEncargado } = await supabase
+    .from('act_integrantes')
+    .select('id')
+    .eq('actividad_id', actividad_id)
+    .eq('usuario_id', user.id)
+    .eq('es_encargado', true)
+    .maybeSingle();
+
+  const esEncargado = !!registroEncargado;
+  const esCreador = actividad.created_by === user.id;
+
+  if (!isJefe && !esCreador && !esEncargado) {
+    throw new Error('No tienes permisos suficientes para publicar el repertorio.');
+  }
+
+  // Actualizar todos los cantos de esta actividad a estado 'publicado'
+  const { error: updateError } = await supabase
+    .from('act_actividades_alabanzas')
+    .update({ estado: 'publicado' })
+    .eq('actividad_id', actividad_id);
+
+  if (updateError) throw new Error(updateError.message);
+
+  // Enviar las notificaciones push
+  await enviarNotificacionesRepertorio(supabase, user.id, actividad_id, actividad.title);
 
   revalidatePath('/kore/planificador');
 }
@@ -338,31 +393,34 @@ export async function obtenerRepertoriosDelMismoDia(actividad_id: string) {
   const fecha = new Date(actividadActual.due_date);
   const fechaSoloDia = fecha.toISOString().split('T')[0];
 
-  // 2. Buscar otras actividades en el mismo da que tengan alabanzas
-  // Nota: Usamos query raw o filtros de fecha para asegurar el da exacto independientemente de la hora
+  // 2. Buscar otras actividades en el mismo día que tengan alabanzas PUBLICADAS
+  // Solo se pueden importar repertorios que ya estén publicados (no borradores)
   const { data: actividadesConCanciones, error } = await supabase
     .from('act_actividades')
     .select(`
       id,
       title,
       modulo,
-      act_actividades_alabanzas!inner (id)
+      act_actividades_alabanzas!inner (id, estado)
     `)
     .neq('id', actividad_id)
     .gte('due_date', `${fechaSoloDia}T00:00:00`)
-    .lte('due_date', `${fechaSoloDia}T23:59:59`);
+    .lte('due_date', `${fechaSoloDia}T23:59:59`)
+    .eq('act_actividades_alabanzas.estado', 'publicado');
 
   if (error) {
-    console.error("Error al buscar repertorios del da:", error);
+    console.error("Error al buscar repertorios del día:", error);
     return [];
   }
 
-  return actividadesConCanciones.map((act: any) => ({
-    id: act.id,
-    title: act.title,
-    modulo: act.modulo,
-    canciones_count: act.act_actividades_alabanzas?.length || 0
-  }));
+  return (actividadesConCanciones || [])
+    .filter((act: any) => act.act_actividades_alabanzas && act.act_actividades_alabanzas.length > 0)
+    .map((act: any) => ({
+      id: act.id,
+      title: act.title,
+      modulo: act.modulo,
+      canciones_count: act.act_actividades_alabanzas?.length || 0
+    }));
 }
 
 export async function clonarRepertorio(origen_id: string, destino_id: string) {

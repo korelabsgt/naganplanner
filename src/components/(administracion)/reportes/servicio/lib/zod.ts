@@ -4,9 +4,34 @@ import { z } from "zod";
 // SCHEMAS DE BASE DE DATOS (LECTURA)
 // =========================================================================
 
+// =========================================================================
+// SCHEMAS DE PLANTILLAS DE SERVICIO
+// =========================================================================
+
+export const plantillaServicioSchema = z.object({
+  id: z.string().uuid(),
+  nombre: z.string().min(1, "El nombre de la plantilla es requerido"),
+  tipo_servicio: z.string().nullable().optional(),
+  minutos_preparacion_previa: z.number().int().default(0),
+  permite_multi_horario: z.boolean().default(false),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+
+export const plantillaServicioFormSchema = z.object({
+  nombre: z.string().min(1, "El nombre de la plantilla es requerido"),
+  tipo_servicio: z.string().nullable().optional(),
+  minutos_preparacion_previa: z.number().int().min(0, "Los minutos no pueden ser negativos").default(0),
+  permite_multi_horario: z.boolean().default(false),
+});
+
+export type PlantillaServicio = z.infer<typeof plantillaServicioSchema>;
+export type PlantillaServicioForm = z.infer<typeof plantillaServicioFormSchema>;
+
 // Schema base de un ítem de configuración (sin hijos para evitar recursión en z.lazy)
 const configProgramaBaseSchema = z.object({
   id: z.string().uuid(),
+  plantilla_id: z.string().uuid().nullable().optional(),
   parent_id: z.string().uuid().nullable().optional(),
   orden: z.number(),
   tipo_elemento: z.enum(['agrupador', 'rol', 'dependencia']),
@@ -28,6 +53,7 @@ export const configProgramaServicioSchema: z.ZodType<ConfigProgramaServicio> = z
 // =========================================================================
 
 export const configProgramaFormSchema = z.object({
+  plantilla_id: z.string().uuid().nullable().optional(),
   parent_id: z.string().uuid().nullable().optional(),
   orden: z.number().int().min(1, "El orden debe ser mayor a 0"),
   tipo_elemento: z.enum(['agrupador', 'rol', 'dependencia']),
@@ -64,6 +90,7 @@ export const reporteItemSchema: z.ZodType<ReporteItem> = z.lazy(() =>
 
 export interface ConfigProgramaServicio {
   id: string;
+  plantilla_id?: string | null;
   parent_id?: string | null;
   orden: number;
   tipo_elemento: 'agrupador' | 'rol' | 'dependencia';
@@ -119,3 +146,4 @@ export type AjustesGlobales = z.infer<typeof ajustesGlobalesSchema>;
 export type AjustesGlobalesForm = z.infer<typeof ajustesGlobalesFormSchema>;
 
 export type ConfigProgramaForm = z.infer<typeof configProgramaFormSchema>;
+

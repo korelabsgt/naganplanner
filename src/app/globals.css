@@ -177,3 +177,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* SweetAlert2 z-index e interactividad global */
+.swal2-container {
+  z-index: 100000 !important;
+  pointer-events: auto !important;
+}
+
+.swal2-popup {
+  pointer-events: auto !important;
+}
+
+.swal2-confirm,
+.swal2-cancel,
+.swal2-deny {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+

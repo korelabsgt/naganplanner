@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   Edit2, Trash2, ChevronDown, Calendar, User, Users,
   Clock, AlertCircle, Ban, Mail, Paperclip, Youtube, X,
-  Star, Music, Copy, BookOpen
+  Star, Music, Copy, BookOpen, Layers, Plus, Send
 } from 'lucide-react';
 import { Planificador, Perfil } from './lib/zod';
 import { usePlanificadorLogic, usePlanificadorMutations } from './lib/hooks';
@@ -38,10 +38,12 @@ interface Props {
   modulo: string;
   tipoVista: 'mis_actividades' | 'mi_equipo' | 'todas';
   departamentosEquipo?: DeptoEquipo[];
+  // Soporte Multi-servicio agrupado
+  serviciosGrupo?: Planificador[];
 }
 
 export default function PlanificadorItem({
-  planificador,
+  planificador: planificadorProp,
   isExpanded = false,
   onToggle,
   usuarioActualId,
@@ -49,10 +51,21 @@ export default function PlanificadorItem({
   isJefe,
   modulo,
   tipoVista,
-  departamentosEquipo = []
+  departamentosEquipo = [],
+  serviciosGrupo = []
 }: Props) {
+  // Manejo de pestaña activa en grupo multi-servicio
+  const [activeSubServiceId, setActiveSubServiceId] = useState<string | null>(null);
+
+  // La actividad actualmente visualizada (si hay pestañas del grupo)
+  const tieneServiciosGrupo = serviciosGrupo.length > 1;
+  const planificador = (tieneServiciosGrupo && activeSubServiceId)
+    ? (serviciosGrupo.find(s => s.id === activeSubServiceId) || planificadorProp)
+    : planificadorProp;
+
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
+  const [isAddServiceOpen, setIsAddServiceOpen] = useState(false);
 
   const [forceShowFiles, setForceShowFiles] = useState(false);
   const [forceShowVideos, setForceShowVideos] = useState(false);
@@ -74,7 +87,7 @@ export default function PlanificadorItem({
     isExpanded
   );
 
-  const { importarRepertorio } = usePlanificadorMutations();
+  const { importarRepertorio, publicarRepertorio } = usePlanificadorMutations();
 
   const handleHeaderClick = (e: React.MouseEvent) => {
     if (permisos.estaPendiente) {
@@ -161,59 +174,61 @@ export default function PlanificadorItem({
   };
 
   const handleClonar = async (origenId: string) => {
-    // Cerramos el popover de inmediato para evitar bloqueos
     setShowImportList(false);
-
     const isDark = document.documentElement.classList.contains('dark');
 
-    setTimeout(() => {
-      Swal.fire({
-        title: '¿Importar Repertorio?',
-        text: 'Esto reemplazará cualquier canción que ya tengas seleccionada en esta actividad.',
-        icon: 'question',
-        width: '500px', // Hacerlo más ancho
-        showCancelButton: true,
-        confirmButtonText: 'Sí, importar',
-        cancelButtonText: 'Cancelar',
-        heightAuto: false,
-        scrollbarPadding: false,
-        showLoaderOnConfirm: true,
-        background: isDark ? '#1a1a1a' : '#ffffff',
-        color: isDark ? '#ffffff' : '#1f2937',
-        buttonsStyling: false,
-        customClass: {
-          popup: 'rounded-3xl shadow-2xl border border-gray-100 dark:border-neutral-800',
-          confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-2.5 mx-2',
-          cancelButton: 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl px-6 py-2.5 mx-2'
-        },
-        preConfirm: async () => {
-          try {
-            await importarRepertorio.mutateAsync({ origenId, destinoId: planificador.id });
-            return true;
-          } catch (error: any) {
-            Swal.showValidationMessage(`Error al importar: ${error.message}`);
-            return false;
-          }
-        },
-        allowOutsideClick: () => !Swal.isLoading()
-      }).then((result) => {
-        if (result.isConfirmed) {
-          setForceShowAlabanzas(true);
-          // Pequeño brindis visual de éxito
-          Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 2000,
-            background: isDark ? '#10b981' : '#d1fae5', // Fondo verde éxito
-            color: isDark ? '#ffffff' : '#065f46'
-          }).fire({
-            icon: 'success',
-            title: 'Importación exitosa'
-          });
-        }
-      });
-    }, 50); // Timeout para evitar bloqueo de eventos de React/Radix
+    const result = await Swal.fire({
+      title: '¿Importar Repertorio?',
+      text: 'Esto reemplazará cualquier canción que ya tengas seleccionada en esta actividad.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, importar',
+      cancelButtonText: 'Cancelar',
+      background: isDark ? '#1a1a1a' : '#ffffff',
+      color: isDark ? '#ffffff' : '#1f2937',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'rounded-3xl shadow-2xl border border-gray-100 dark:border-neutral-800',
+        confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-2.5 mx-2 cursor-pointer shadow-md',
+        cancelButton: 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl px-6 py-2.5 mx-2 cursor-pointer'
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await importarRepertorio.mutateAsync({ origenId, destinoId: planificador.id });
+        setForceShowAlabanzas(true);
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: 'Repertorio importado correctamente',
+          showConfirmButton: false,
+          timer: 2000,
+          background: isDark ? '#1a1a1a' : '#ffffff',
+          color: isDark ? '#ffffff' : '#1f2937'
+        });
+      } catch (error: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al importar',
+          text: error.message || 'No se pudo importar el repertorio',
+          background: isDark ? '#1a1a1a' : '#ffffff',
+          color: isDark ? '#ffffff' : '#1f2937'
+        });
+      }
+    }
+  };
+
+  // Formato de hora compacto para las pestañas
+  const formatHoraTab = (isoDate?: string | null) => {
+    if (!isoDate) return '';
+    try {
+      const d = new Date(isoDate);
+      return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } catch {
+      return '';
+    }
   };
 
   return (
@@ -230,18 +245,26 @@ export default function PlanificadorItem({
           className={`p-4 sm:p-5 cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${permisos.estaPendiente ? 'hover:bg-blue-50/30 dark:hover:bg-blue-900/10' : ''}`}
         >
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
 
-              {/* ÚNICO BADGE VISIBLE: TIPO DE SERVICIO */}
+              {/* BADGE: TIPO DE SERVICIO */}
               <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border ${getServiceBadgeStyle(planificador.status)}`}>
                 {(planificador.status === 'servicio_especial' || planificador.status === 'especial') && <Star size={10} className="fill-current" />}
                 {getServiceLabel(planificador.status)}
               </span>
 
+              {/* BADGE DISTINTIVO: JORNADA MULTI-SERVICIO */}
+              {tieneServiciosGrupo && (
+                <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  <Layers size={11} className="text-blue-500" />
+                  {serviciosGrupo.length} SERVICIOS
+                </span>
+              )}
+
             </div>
 
             <h3 className="font-bold text-gray-800 dark:text-[#f4ebc3] truncate text-base">
-              {isExpanded ? 'Detalles de la actividad' : planificador.title}
+              {planificador.title}
             </h3>
 
             {!isExpanded && (
@@ -298,8 +321,50 @@ export default function PlanificadorItem({
         {/* ================= CUERPO EXPANDIDO ================= */}
         <div className={`
           flex flex-col overflow-hidden transition-all duration-300 ease-in-out
-          ${isExpanded ? 'max-h-1250 border-t border-gray-100 dark:border-blue-900/30' : 'max-h-0 border-t-0'}
+          ${isExpanded ? 'max-h-1250 border-t border-gray-100 dark:border-neutral-800' : 'max-h-0 border-t-0'}
         `}>
+          {/* ================= BARRA DE PESTAÑAS (Visible al expandir la actividad) ================= */}
+          {tieneServiciosGrupo && (
+            <div className="px-4 sm:px-6 bg-gray-50/90 dark:bg-neutral-900/90 border-b border-gray-100 dark:border-neutral-800 flex items-center gap-6 overflow-x-auto custom-scrollbar">
+              {serviciosGrupo.map((serv, idx) => {
+                const isSelected = (activeSubServiceId ? serv.id === activeSubServiceId : idx === 0);
+                const hora = formatHoraTab(serv.due_date);
+                return (
+                  <button
+                    key={serv.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveSubServiceId(serv.id);
+                    }}
+                    className={`relative flex items-center gap-2 py-2.5 cursor-pointer shrink-0 transition-colors text-left ${
+                      isSelected
+                        ? 'text-blue-600 dark:text-blue-400 font-bold'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium'
+                    }`}
+                  >
+                    <Calendar size={15} className={`shrink-0 self-center ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-neutral-500'}`} />
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-xs sm:text-sm tracking-tight whitespace-nowrap">
+                        {`Servicio ${idx + 1}`}
+                      </span>
+                      {hora && (
+                        <span className={`text-[10px] sm:text-[11px] font-medium ${isSelected ? 'text-blue-500/90 dark:text-blue-300' : 'text-gray-400 dark:text-neutral-500'}`}>
+                          {hora}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Línea inferior activa azul */}
+                    {isSelected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-blue-600 dark:bg-blue-500 rounded-t-full shadow-sm" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="px-1 py-4 sm:px-5 sm:py-6 bg-gray-50/50 dark:bg-transparent flex flex-col gap-6">
 
             <div className="flex flex-col gap-3">
@@ -411,91 +476,112 @@ export default function PlanificadorItem({
                     </button>
                   )}
 
-                  <div className="flex flex-col gap-3">
+                  {(() => {
+                    const tieneBorrador = alabanzasSeguras.some((s: any) => s.estado === 'borrador');
+                    const estaEnPreparacion = alabanzasSeguras.length > 0 && tieneBorrador;
+                    const puedeVerDetalle = puedeGestionarContenido || !estaEnPreparacion;
 
-                    {/* Fila superior: icono + título */}
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 shrink-0 flex items-center justify-center bg-gradient-to-br from-[#d6a738] to-[#c08e2a] text-white rounded-xl shadow-lg shadow-[#d6a738]/20">
-                        <Music size={24} />
-                      </div>
-                      <div>
-                        <h4 className="font-black text-lg text-[#4a3f36] dark:text-[#f4ebc3] tracking-tight">Repertorio Musical</h4>
-                        <p className="text-xs font-bold text-[#847563] uppercase tracking-widest mt-0.5">{alabanzasSeguras.length} CANTOS PROGRAMADOS</p>
-                      </div>
-                    </div>
-
-                    {/* Fila inferior: botones de acción */}
-                    <div className="flex items-center gap-2">
-
-                      {/* Botón importar — solo visible si no hay canciones */}
-                      {alabanzasSeguras.length === 0 && puedeGestionarContenido && (
-                        <div className="relative flex-1" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleBuscarRepertorios(); }}
-                            disabled={isSearchingRepertorios}
-                            title="Importar de otra actividad de hoy"
-                            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 dark:bg-[#1a2b4b] dark:text-[#60a5fa] border border-blue-100 dark:border-[#2a3b5b] rounded-xl hover:bg-blue-100 dark:hover:bg-[#1e345b] transition-all active:scale-95 shadow-sm"
-                          >
-                            {isSearchingRepertorios ? <Music size={15} className="animate-pulse" /> : <Copy size={15} />}
-                            <span className="text-[10px] font-black uppercase tracking-widest">
-                              {isSearchingRepertorios ? 'Buscando...' : 'Importar de Hoy'}
-                            </span>
-                          </button>
-
-                          {showImportList && (
-                            <div className="absolute z-50 top-full left-0 mt-2 p-3 bg-white dark:bg-neutral-800 rounded-2xl border border-gray-200 dark:border-[#3e3630] shadow-2xl animate-in fade-in slide-in-from-top-2 w-[250px] max-w-[85vw]">
-                              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-neutral-700">
-                                <span className="text-[10px] font-black uppercase text-gray-400">¿Importar de hoy?</span>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setShowImportList(false); }}
-                                  className="hover:text-red-500 text-gray-400 transition-colors"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
-                              <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1">
-                                {repertoriosHoy.length === 0 ? (
-                                  <p className="text-xs text-center py-4 text-gray-500">No hay otros repertorios hoy</p>
-                                ) : (
-                                  repertoriosHoy.map(rep => (
-                                    <button
-                                      key={rep.id}
-                                      onClick={(e) => { e.stopPropagation(); handleClonar(rep.id); }}
-                                      className="flex flex-col text-left p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-blue-700 dark:text-blue-300 w-full"
-                                    >
-                                      <span className="text-[11px] font-bold truncate">{rep.title}</span>
-                                      <span className="text-[9px] opacity-70">{rep.canciones_count} cantos</span>
-                                    </button>
-                                  ))
+                    return (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 flex items-center justify-center bg-gradient-to-br from-[#d6a738] to-[#c08e2a] text-white rounded-xl shadow-lg shadow-[#d6a738]/20">
+                              <Music size={22} className="sm:hidden" />
+                              <Music size={24} className="hidden sm:block" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-black text-base sm:text-lg text-[#4a3f36] dark:text-[#f4ebc3] tracking-tight">Repertorio Musical</h4>
+                              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                <span className="text-[10px] sm:text-xs font-bold text-[#847563] uppercase tracking-wider whitespace-nowrap">
+                                  <span className="sm:hidden">{alabanzasSeguras.length} {alabanzasSeguras.length === 1 ? 'CANTO' : 'CANTOS'}</span>
+                                  <span className="hidden sm:inline">{alabanzasSeguras.length} {alabanzasSeguras.length === 1 ? 'CANTO PROGRAMADO' : 'CANTOS PROGRAMADOS'}</span>
+                                </span>
+                                {estaEnPreparacion && (
+                                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full whitespace-nowrap">
+                                    En preparación
+                                  </span>
                                 )}
                               </div>
                             </div>
+                          </div>
+                        </div>
+
+                        {estaEnPreparacion && !puedeGestionarContenido && (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center gap-2">
+                            <span>⏳</span>
+                            <span>El repertorio musical se encuentra actualmente en preparación.</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          {alabanzasSeguras.length === 0 && puedeGestionarContenido && (
+                            <div className="relative flex-1" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleBuscarRepertorios(); }}
+                                disabled={isSearchingRepertorios}
+                                title="Importar de otra actividad de hoy"
+                                className="w-full h-10 flex items-center justify-center gap-2 px-3 bg-blue-50 text-blue-700 dark:bg-[#1a2b4b] dark:text-[#60a5fa] border border-blue-100 dark:border-[#2a3b5b] rounded-xl hover:bg-blue-100 dark:hover:bg-[#1e345b] transition-all active:scale-95 shadow-sm"
+                              >
+                                {isSearchingRepertorios ? <Music size={15} className="animate-pulse" /> : <Copy size={15} />}
+                                <span className="text-[10px] font-black uppercase tracking-widest truncate">
+                                  {isSearchingRepertorios ? 'Buscando...' : 'Importar de Hoy'}
+                                </span>
+                              </button>
+
+                              {showImportList && (
+                                <div className="absolute z-50 top-full left-0 mt-2 p-3 bg-white dark:bg-neutral-800 rounded-2xl border border-gray-200 dark:border-[#3e3630] shadow-2xl animate-in fade-in slide-in-from-top-2 w-[250px] max-w-[85vw]">
+                                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-neutral-700">
+                                    <span className="text-[10px] font-black uppercase text-gray-400">¿Importar de hoy?</span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setShowImportList(false); }}
+                                      className="hover:text-red-500 text-gray-400 transition-colors"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1">
+                                    {repertoriosHoy.length === 0 ? (
+                                      <p className="text-xs text-center py-4 text-gray-500">No hay otros repertorios hoy</p>
+                                    ) : (
+                                      repertoriosHoy.map(rep => (
+                                        <button
+                                          key={rep.id}
+                                          onClick={(e) => { e.stopPropagation(); handleClonar(rep.id); }}
+                                          className="flex flex-col text-left p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-blue-700 dark:text-blue-300 w-full"
+                                        >
+                                          <span className="text-[11px] font-bold truncate">{rep.title}</span>
+                                          <span className="text-[9px] opacity-70">{rep.canciones_count} cantos</span>
+                                        </button>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {alabanzasSeguras.length > 0 && puedeVerDetalle && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setModalRepertorioOpen(true); }}
+                              className="flex-1 h-10 px-4 bg-neutral-900 text-white dark:bg-[#f4ebc3] dark:text-[#2a2624] rounded-xl text-[10px] font-black uppercase tracking-widest transition-transform active:scale-95 shadow-md flex justify-center items-center text-center"
+                            >
+                              Ver Repertorio
+                            </button>
+                          )}
+
+                          {puedeGestionarContenido && (
+                            <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                              <GestorAlabanzaActividad
+                                actividadId={planificador.id}
+                                alabanzasIniciales={alabanzasSeguras}
+                                readonly={!puedeGestionarContenido}
+                              />
+                            </div>
                           )}
                         </div>
-                      )}
-
-                      {/* Ver Repertorio */}
-                      {alabanzasSeguras.length > 0 && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setModalRepertorioOpen(true); }}
-                          className="flex-1 px-4 py-2 bg-neutral-900 text-white dark:bg-[#f4ebc3] dark:text-[#2a2624] rounded-xl text-[10px] font-black uppercase tracking-widest transition-transform active:scale-95 shadow-md flex justify-center items-center"
-                        >
-                          Ver Repertorio
-                        </button>
-                      )}
-
-                      {/* Añadir / editar canciones */}
-                      {puedeGestionarContenido && (
-                        <div className="flex-1" onClick={(e) => e.stopPropagation()}>
-                          <GestorAlabanzaActividad
-                            actividadId={planificador.id}
-                            alabanzasIniciales={alabanzasSeguras}
-                            readonly={!puedeGestionarContenido}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })()}
 
                   <ModalRepertorioActividad
                     isOpen={modalRepertorioOpen}
@@ -638,6 +724,7 @@ export default function PlanificadorItem({
           modulo={modulo}
           tipoVista={tipoVista}
           departamentosEquipo={departamentosEquipo}
+          actividadesDelGrupo={serviciosGrupo}
         />
       )}
 

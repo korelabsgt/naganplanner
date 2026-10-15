@@ -146,6 +146,7 @@ export async function obtenerDatosPlanificador(
         alabanza_id,
         id_director,
         observaciones,
+        estado,
         act_banco_alabanzas (*)
       ),
       act_dones_espirituales (*),
@@ -188,6 +189,7 @@ export async function obtenerDatosPlanificador(
       return {
         ...dbSong,
         rel_id: rel.id, // Guardamos el ID de la relación por si acaso
+        estado: rel.estado || 'publicado',
         director_id: rel.id_director,
         director_nombre: directorPerfil?.nombre || null,
         observaciones: rel.observaciones || dbSong.observaciones || null
@@ -252,7 +254,8 @@ export async function guardarPlanificador(data: PlanificadorForm, idEdicion?: st
     modulo: parsed.data.modulo || null,
     status: parsed.data.status,
     videos_url: parsed.data.videos_url || [],
-    archivos_drive: parsed.data.archivos_drive || []
+    archivos_drive: parsed.data.archivos_drive || [],
+    ...(parsed.data.group_id !== undefined ? { group_id: parsed.data.group_id } : {})
   };
 
   let actividadId = idEdicion;
@@ -288,6 +291,77 @@ export async function guardarPlanificador(data: PlanificadorForm, idEdicion?: st
       payloadActividad.videos_url = tareaActual.videos_url || [];
       payloadActividad.archivos_drive = tareaActual.archivos_drive || [];
       reprogramada = false; // Sin permisos no cambia la fecha real
+    }
+
+    // Si la actividad pertenece a un grupo multi-servicio
+    if (tareaActual.group_id) {
+      const { data: hermanosGrupo } = await supabase
+        .from('act_actividades')
+        .select('id, due_date, created_at')
+        .eq('group_id', tareaActual.group_id);
+
+      if (hermanosGrupo && hermanosGrupo.length > 1) {
+        // Ordenar cronológicamente para identificar certeramente el primer servicio de la jornada
+        hermanosGrupo.sort((a, b) => {
+          const tA = a.due_date ? new Date(a.due_date).getTime() : 0;
+          const tB = b.due_date ? new Date(b.due_date).getTime() : 0;
+          if (tA !== tB) return tA - tB;
+          const cA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const cB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return cA - cB;
+        });
+
+        const esPrimerServicio = hermanosGrupo[0].id === idEdicion;
+
+        if (esPrimerServicio) {
+          // El primer servicio sí permite cambiar fecha y propaga la nueva fecha al resto de servicios del grupo
+          if (fechaVencimiento) {
+            const nuevaFechaBase = fechaVencimiento.split('T')[0];
+            const otrosHermanos = hermanosGrupo.filter(h => h.id !== idEdicion);
+
+            for (const hno of otrosHermanos) {
+              if (hno.due_date) {
+                const dHno = new Date(hno.due_date);
+                const horaFormateada = new Intl.DateTimeFormat('en-GB', {
+                  timeZone: 'America/Guatemala',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                }).format(dHno);
+                const nuevoDueDateHno = `${nuevaFechaBase}T${horaFormateada}-06:00`;
+                await supabase
+                  .from('act_actividades')
+                  .update({ due_date: nuevoDueDateHno })
+                  .eq('id', hno.id);
+              }
+            }
+          }
+        } else {
+          // Si NO es el primer servicio, se bloquea el cambio de fecha (mantiene la fecha del primer servicio)
+          if (hermanosGrupo[0].due_date && fechaVencimiento) {
+            const dPrimer = new Date(hermanosGrupo[0].due_date);
+            const fechaPrimerServicio = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/Guatemala',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }).format(dPrimer);
+
+            const dActual = new Date(fechaVencimiento);
+            const horaActual = new Intl.DateTimeFormat('en-GB', {
+              timeZone: 'America/Guatemala',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false
+            }).format(dActual);
+
+            fechaVencimiento = `${fechaPrimerServicio}T${horaActual}-06:00`;
+            payloadActividad.due_date = fechaVencimiento;
+          }
+        }
+      }
     }
 
     const { data: intAnt } = await supabase.from('act_integrantes').select('*').eq('actividad_id', idEdicion);
@@ -426,7 +500,61 @@ export async function guardarPlanificador(data: PlanificadorForm, idEdicion?: st
     }
   }
 
+  revalidatePath('/kore/planificador');
   revalidatePath('/admin/planificador');
+}
+
+export async function guardarPlanificadorGrupo(servicios: PlanificadorForm[]) {
+  if (!servicios || servicios.length === 0) {
+    throw new Error('Debe proporcionarse al menos un servicio.');
+  }
+
+  // Generamos un UUID de grupo para todos
+  const groupId = crypto.randomUUID();
+
+  // Guardamos cada servicio asignándole el mismo group_id
+  for (const s of servicios) {
+    await guardarPlanificador({
+      ...s,
+      group_id: groupId
+    });
+  }
+
+  revalidatePath('/kore/planificador');
+  revalidatePath('/admin/planificador');
+  return { success: true, group_id: groupId };
+}
+
+export async function agregarServicioAGrupo(servicio: PlanificadorForm, baseActividadId: string) {
+  const supabase = await createClient();
+  const { data: baseAct } = await supabase
+    .from('act_actividades')
+    .select('id, group_id')
+    .eq('id', baseActividadId)
+    .single();
+
+  if (!baseAct) throw new Error('Actividad base no encontrada.');
+
+  let targetGroupId = baseAct.group_id;
+
+  // Si la actividad base no tenía group_id aún, le creamos uno y la actualizamos
+  if (!targetGroupId) {
+    targetGroupId = crypto.randomUUID();
+    await supabase
+      .from('act_actividades')
+      .update({ group_id: targetGroupId })
+      .eq('id', baseAct.id);
+  }
+
+  // Guardamos el nuevo servicio con ese group_id
+  await guardarPlanificador({
+    ...servicio,
+    group_id: targetGroupId
+  });
+
+  revalidatePath('/kore/planificador');
+  revalidatePath('/admin/planificador');
+  return { success: true, group_id: targetGroupId };
 }
 
 export async function eliminarPlanificador(id: string) {
@@ -435,7 +563,11 @@ export async function eliminarPlanificador(id: string) {
   if (!user) throw new Error('No autenticado');
 
   const isJefe = await checkIsJefe(supabase, user.id);
-  const { data: tareaActual } = await supabase.from('act_actividades').select('status, created_by, due_date').eq('id', id).single();
+  const { data: tareaActual } = await supabase
+    .from('act_actividades')
+    .select('status, created_by, due_date, group_id')
+    .eq('id', id)
+    .single();
 
   if (!isJefe) {
     const esActividadPasada = tareaActual?.due_date && new Date(tareaActual.due_date) < new Date();
@@ -448,10 +580,29 @@ export async function eliminarPlanificador(id: string) {
     }
   }
 
-  await supabase.from('act_integrantes').delete().eq('actividad_id', id);
+  // Si pertenece a un grupo de servicios múltiples, recopilar todos los IDs del grupo
+  let idsAEliminar = [id];
+  if (tareaActual?.group_id) {
+    const { data: todasDelGrupo } = await supabase
+      .from('act_actividades')
+      .select('id')
+      .eq('group_id', tareaActual.group_id);
 
-  const { error } = await supabase.from('act_actividades').delete().eq('id', id);
+    if (todasDelGrupo && todasDelGrupo.length > 0) {
+      idsAEliminar = todasDelGrupo.map(t => t.id);
+    }
+  }
+
+  // Eliminar relaciones de todos los servicios a borrar
+  await supabase.from('act_integrantes').delete().in('actividad_id', idsAEliminar);
+  await supabase.from('act_acuerdos_reunion').delete().in('actividad_id', idsAEliminar);
+  await supabase.from('act_dones_espirituales').delete().in('actividad_id', idsAEliminar);
+  await supabase.from('act_actividades_alabanzas').delete().in('actividad_id', idsAEliminar);
+  await supabase.from('act_adjuntos').delete().in('actividad_id', idsAEliminar);
+
+  const { error } = await supabase.from('act_actividades').delete().in('id', idsAEliminar);
   if (error) throw new Error(error.message);
 
   revalidatePath('/kore/planificador');
 }
+

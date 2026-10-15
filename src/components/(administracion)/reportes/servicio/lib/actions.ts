@@ -2,7 +2,15 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { ConfigProgramaForm, ConfigProgramaServicio, ReporteItem, AjustesGlobales, AjustesGlobalesForm } from './zod';
+import { 
+  ConfigProgramaForm, 
+  ConfigProgramaServicio, 
+  ReporteItem, 
+  AjustesGlobales, 
+  AjustesGlobalesForm,
+  PlantillaServicio,
+  PlantillaServicioForm
+} from './zod';
 
 // =========================================================================
 // HELPERS
@@ -58,18 +66,101 @@ function construirArbol(items: ConfigProgramaServicio[]): ConfigProgramaServicio
 }
 
 // =========================================================================
-// LECTURA DE CONFIGURACIÓN
+// CRUD DE PLANTILLAS DE SERVICIO
 // =========================================================================
 
-export async function obtenerConfigPrograma(): Promise<ConfigProgramaServicio[] | null> {
+export async function obtenerPlantillasServicio(): Promise<PlantillaServicio[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('act_plantillas_servicio')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error al obtener plantillas de servicio:', error);
+    return [];
+  }
+
+  return (data || []) as PlantillaServicio[];
+}
+
+export async function guardarPlantillaServicio(
+  formData: PlantillaServicioForm,
+  id?: string
+): Promise<{ ok: boolean; data?: PlantillaServicio; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'No autorizado' };
+
+  const payload = {
+    nombre: formData.nombre,
+    tipo_servicio: formData.tipo_servicio ?? null,
+    minutos_preparacion_previa: formData.minutos_preparacion_previa ?? 0,
+    permite_multi_horario: formData.permite_multi_horario ?? false,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (id) {
+    const { data, error } = await supabase
+      .from('act_plantillas_servicio')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return { ok: false, error: error.message };
+    revalidatePath('/');
+    return { ok: true, data };
+  } else {
+    const { data, error } = await supabase
+      .from('act_plantillas_servicio')
+      .insert({ ...payload, created_at: new Date().toISOString() })
+      .select()
+      .single();
+
+    if (error) return { ok: false, error: error.message };
+    revalidatePath('/');
+    return { ok: true, data };
+  }
+}
+
+export async function eliminarPlantillaServicio(id: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'No autorizado' };
+
+  const { error } = await supabase
+    .from('act_plantillas_servicio')
+    .delete()
+    .eq('id', id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/');
+  return { ok: true };
+}
+
+// =========================================================================
+// LECTURA DE CONFIGURACIÓN POR PLANTILLA
+// =========================================================================
+
+export async function obtenerConfigPrograma(plantillaId?: string): Promise<ConfigProgramaServicio[] | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('act_config_programa_servicio')
     .select('*')
     .order('orden', { ascending: true });
+
+  if (plantillaId) {
+    query = query.eq('plantilla_id', plantillaId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error al obtener configuración del programa:', error);
@@ -96,7 +187,6 @@ export async function obtenerAjustesGlobales(): Promise<AjustesGlobales | null> 
     return null;
   }
   
-  // Si no existe, podemos devolver un objeto por defecto
   if (!data) {
     return {
       id: 'default',
@@ -117,7 +207,6 @@ export async function guardarAjustesGlobales(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'No autorizado' };
 
-  // Verificamos si ya existe la fila
   const { data: existente } = await supabase
     .from('act_ajustes_globales')
     .select('id')
@@ -148,7 +237,7 @@ export async function guardarAjustesGlobales(
 }
 
 // =========================================================================
-// 2. CRUD (ESCRITURA) CONFIGURACIÓN
+// 2. CRUD (ESCRITURA) CONFIGURACIÓN DE BLOQUES
 // =========================================================================
 
 export async function guardarConfigPrograma(
@@ -160,6 +249,7 @@ export async function guardarConfigPrograma(
   if (!user) return { ok: false, error: 'No autorizado' };
 
   const payload = {
+    plantilla_id: formData.plantilla_id ?? null,
     parent_id: formData.parent_id ?? null,
     orden: formData.orden,
     tipo_elemento: formData.tipo_elemento,
@@ -190,7 +280,6 @@ export async function eliminarConfigPrograma(id: string): Promise<{ ok: boolean;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'No autorizado' };
 
-  // ON DELETE CASCADE en la BD maneja los hijos automáticamente
   const { error } = await supabase
     .from('act_config_programa_servicio')
     .delete()
@@ -222,127 +311,229 @@ export async function reordenarConfigPrograma(
 }
 
 // =========================================================================
-// GENERACIÓN DEL REPORTE
+// GENERACIÓN DEL REPORTE (MULTISERVICIO / RECONOCIMIENTO CRONOLÓGICO)
 // =========================================================================
 
 export async function generarReporteServicio(
-  fechaHora: string
+  fechaHora: string,
+  plantillaIdSeleccionada?: string | null
 ): Promise<ReporteItem[] | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // 0. Obtener ajustes globales para el retraso de inicio
-  const ajustes = await obtenerAjustesGlobales();
-  const retrasoMinutos = ajustes?.minutos_preparacion_previa ?? 0;
+  let plantillaConfig: ConfigProgramaServicio[] = [];
+  let retrasoMinutos = 0;
+  let permiteMultiHorario = false;
 
-  // 1. Obtener la plantilla de configuración
-  const { data: configRaw } = await supabase
-    .from('act_config_programa_servicio')
-    .select('*')
-    .order('orden', { ascending: true });
+  if (plantillaIdSeleccionada) {
+    const { data: plantillaDB } = await supabase
+      .from('act_plantillas_servicio')
+      .select('*')
+      .eq('id', plantillaIdSeleccionada)
+      .single();
 
-  if (!configRaw || configRaw.length === 0) return [];
+    if (plantillaDB) {
+      retrasoMinutos = plantillaDB.minutos_preparacion_previa ?? 0;
+      permiteMultiHorario = plantillaDB.permite_multi_horario ?? false;
+    }
 
-  const plantilla = construirArbol(configRaw);
+    const { data: configRaw } = await supabase
+      .from('act_config_programa_servicio')
+      .select('*')
+      .eq('plantilla_id', plantillaIdSeleccionada)
+      .order('orden', { ascending: true });
 
-  // 2. Buscar actividades que coincidan con la fecha/hora dada
-  const { data: actividades } = await supabase
+    plantillaConfig = construirArbol(configRaw ?? []);
+  }
+
+  // Fallback si no hay plantilla específica o no tiene items: buscar primera plantilla o items huérfanos
+  if (plantillaConfig.length === 0) {
+    const ajustes = await obtenerAjustesGlobales();
+    if (retrasoMinutos === 0) {
+      retrasoMinutos = ajustes?.minutos_preparacion_previa ?? 0;
+    }
+    const { data: configRaw } = await supabase
+      .from('act_config_programa_servicio')
+      .select('*')
+      .order('orden', { ascending: true });
+
+    plantillaConfig = construirArbol(configRaw ?? []);
+  }
+
+  if (plantillaConfig.length === 0) return [];
+
+  // 2. Buscar si la actividad de fechaHora pertenece a un grupo (group_id)
+  const { data: actividadInicial } = await supabase
+    .from('act_actividades')
+    .select('id, group_id, due_date')
+    .eq('due_date', fechaHora)
+    .limit(1)
+    .maybeSingle();
+
+  let queryActividades = supabase
     .from('act_actividades')
     .select(`
       id,
       title,
       modulo,
       due_date,
+      group_id,
+      status,
       act_integrantes (
         usuario_id,
         rol,
         es_encargado,
         "invitación"
       )
-    `)
-    .eq('due_date', fechaHora);
+    `);
 
-  const actividadesData = actividades ?? [];
+  // Si tiene group_id, traer todas las actividades vinculadas al grupo
+  if (actividadInicial?.group_id) {
+    queryActividades = queryActividades.eq('group_id', actividadInicial.group_id);
+  } else {
+    // Si no tiene grupo, traer las que coincidan exactamente con la fechaHora
+    queryActividades = queryActividades.eq('due_date', fechaHora);
+  }
 
+  const { data: actividadesRaw } = await queryActividades.order('due_date', { ascending: true });
+  const actividadesData = actividadesRaw ?? [];
+
+  // 3. Obtener perfiles de usuarios
   const { data: rawProfiles } = await supabase.from('profiles').select('id, nombre, avatar_url');
   const profilesMap = new Map((rawProfiles || []).map(p => [p.id, p]));
 
-  // 3. Extraer todos los integrantes con sus roles de las actividades
-  const integrantesPorRol = new Map<string, { nombre: string; avatar_url?: string | null; rol?: string | null }[]>();
-  const integrantesPorModulo = new Map<string, { nombre: string; avatar_url?: string | null; rol?: string | null }[]>();
+  // 4. Identificar si hay múltiples horarios distintos (Tandas / Servicios consecutivos)
+  const horariosUnicos = Array.from(
+    new Set(actividadesData.map(a => a.due_date).filter(Boolean))
+  ).sort() as string[];
 
-  for (const act of actividadesData) {
-    const integrantes = (act.act_integrantes ?? []) as any[];
-    for (const i of integrantes) {
-      if (i.invitación !== true) continue;
+  // Si no hay horarios detectados, usamos la fechaHora pasada
+  const listaHorarios = horariosUnicos.length > 0 ? horariosUnicos : [fechaHora];
 
-      const perfil = profilesMap.get(i.usuario_id);
-      const persona = {
-        nombre: perfil?.nombre ?? 'Sin nombre',
-        avatar_url: perfil?.avatar_url ?? null,
-        rol: i.rol ?? null,
+  // Helper para construir el reporte de una tanda horaria específica
+  function procesarTanda(
+    horaServicio: string,
+    indiceTanda: number,
+    esMultiTanda: boolean,
+    prefijoNumero: string = ''
+  ): ReporteItem[] {
+    // Filtrar actividades correspondientes a este horario
+    const actsDeEsteHorario = actividadesData.filter(a => a.due_date === horaServicio);
+
+    const integrantesPorRol = new Map<string, { nombre: string; avatar_url?: string | null; rol?: string | null }[]>();
+    const integrantesPorModulo = new Map<string, { nombre: string; avatar_url?: string | null; rol?: string | null }[]>();
+
+    for (const act of actsDeEsteHorario) {
+      const integrantes = (act.act_integrantes ?? []) as any[];
+      for (const i of integrantes) {
+        if (i.invitación !== true) continue;
+
+        const perfil = profilesMap.get(i.usuario_id);
+        const persona = {
+          nombre: perfil?.nombre ?? 'Sin nombre',
+          avatar_url: perfil?.avatar_url ?? null,
+          rol: i.rol ?? null,
+        };
+
+        if (i.rol) {
+          const rolKey = i.rol.toLowerCase().trim();
+          if (!integrantesPorRol.has(rolKey)) integrantesPorRol.set(rolKey, []);
+          integrantesPorRol.get(rolKey)!.push(persona);
+        }
+
+        if (act.modulo) {
+          const moduloKey = act.modulo.toLowerCase().trim();
+          if (!integrantesPorModulo.has(moduloKey)) integrantesPorModulo.set(moduloKey, []);
+          integrantesPorModulo.get(moduloKey)!.push(persona);
+        }
+      }
+    }
+
+    const horaBase = new Date(new Date(horaServicio).getTime() + retrasoMinutos * 60000);
+    let minutosAcumulados = 0;
+
+    function resolverIntegrantes(item: ConfigProgramaServicio) {
+      if (!item.nombre_mostrar) return [];
+      const key = item.nombre_mostrar.toLowerCase().trim();
+      if (item.tipo_elemento === 'rol') {
+        return integrantesPorRol.get(key) ?? [];
+      }
+      if (item.tipo_elemento === 'dependencia') {
+        return integrantesPorModulo.get(key) ?? [];
+      }
+      return [];
+    }
+
+    function mapearItem(item: ConfigProgramaServicio, numeroPadre: string): ReporteItem {
+      const hijos = (item.hijos ?? []).map((hijo, idx) =>
+        mapearItem(hijo, `${numeroPadre}.${idx + 1}`)
+      );
+
+      const tiempoTotal =
+        item.tipo_elemento === 'agrupador'
+          ? calcularTiempoAgrupador(item.hijos ?? [])
+          : (item.tiempo_minutos ?? 0);
+
+      const { inicio, fin } = calcularHoras(horaBase, minutosAcumulados);
+      if (item.tipo_elemento !== 'agrupador') {
+        minutosAcumulados += tiempoTotal;
+      }
+
+      return {
+        numero: numeroPadre,
+        nombre: item.nombre_mostrar,
+        tipo: item.tipo_elemento,
+        integrantes: resolverIntegrantes(item),
+        tiempo_minutos: tiempoTotal,
+        hora_inicio: inicio,
+        hora_fin: fin,
+        hijos: hijos.length > 0 ? hijos : undefined,
       };
-
-      // Indexar por rol
-      if (i.rol) {
-        const rolKey = i.rol.toLowerCase().trim();
-        if (!integrantesPorRol.has(rolKey)) integrantesPorRol.set(rolKey, []);
-        integrantesPorRol.get(rolKey)!.push(persona);
-      }
-
-      // Indexar por módulo de la actividad
-      if (act.modulo) {
-        const moduloKey = act.modulo.toLowerCase().trim();
-        if (!integrantesPorModulo.has(moduloKey)) integrantesPorModulo.set(moduloKey, []);
-        integrantesPorModulo.get(moduloKey)!.push(persona);
-      }
     }
+
+    return plantillaConfig.map((item, idx) => {
+      const numBase = prefijoNumero ? `${prefijoNumero}.${idx + 1}` : String(idx + 1);
+      return mapearItem(item, numBase);
+    });
   }
 
-  // 4. Construir el reporte cruzando plantilla con integrantes
-  // horaBase = fechaHora de la actividad + los minutos de preparación previos
-  const horaBase = new Date(new Date(fechaHora).getTime() + retrasoMinutos * 60000);
-  let minutosAcumulados = 0;
-
-  function resolverIntegrantes(item: ConfigProgramaServicio) {
-    if (!item.nombre_mostrar) return [];
-    const key = item.nombre_mostrar.toLowerCase().trim();
-    if (item.tipo_elemento === 'rol') {
-      return integrantesPorRol.get(key) ?? [];
-    }
-    if (item.tipo_elemento === 'dependencia') {
-      return integrantesPorModulo.get(key) ?? [];
-    }
-    return [];
+  // Si solo hay un horario o la plantilla NO tiene marcado multi-horario, procesamos únicamente la hora seleccionada
+  if (listaHorarios.length <= 1 || !permiteMultiHorario) {
+    return procesarTanda(fechaHora, 0, false);
   }
 
-  function mapearItem(item: ConfigProgramaServicio, numeroPadre: string): ReporteItem {
-    const hijos = (item.hijos ?? []).map((hijo, idx) =>
-      mapearItem(hijo, `${numeroPadre}.${idx + 1}`)
-    );
+  // Si hay MÚLTIPLES horarios (Grupo de servicios en la misma fecha)
+  // Agrupamos cada tanda como un gran bloque contenedor para ordenarlo limpiamente
+  const reporteCompleto: ReporteItem[] = [];
 
-    const tiempoTotal =
-      item.tipo_elemento === 'agrupador'
-        ? calcularTiempoAgrupador(item.hijos ?? [])
-        : (item.tiempo_minutos ?? 0);
+  listaHorarios.forEach((horaIso, idx) => {
+    const dateObj = new Date(horaIso);
+    const horaTexto = dateObj.toLocaleTimeString('es-ES', {
+      timeZone: 'America/Guatemala',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).toUpperCase();
 
-    const { inicio, fin } = calcularHoras(horaBase, minutosAcumulados);
-    if (item.tipo_elemento !== 'agrupador') {
-      minutosAcumulados += tiempoTotal;
-    }
+    const itemsDeLaTanda = procesarTanda(horaIso, idx, true, String(idx + 1));
+    const tiempoTotalTanda = itemsDeLaTanda.reduce((acc, it) => acc + it.tiempo_minutos, 0);
 
-    return {
-      numero: numeroPadre,
-      nombre: item.nombre_mostrar,
-      tipo: item.tipo_elemento,
-      integrantes: resolverIntegrantes(item),
-      tiempo_minutos: tiempoTotal,
-      hora_inicio: inicio,
-      hora_fin: fin,
-      hijos: hijos.length > 0 ? hijos : undefined,
-    };
-  }
+    const primerHijo = itemsDeLaTanda[0];
+    const ultimoHijo = itemsDeLaTanda[itemsDeLaTanda.length - 1];
 
-  return plantilla.map((item, idx) => mapearItem(item, String(idx + 1)));
+    reporteCompleto.push({
+      numero: String(idx + 1),
+      nombre: `SERVICIO ${idx + 1} (${horaTexto})`,
+      tipo: 'agrupador',
+      integrantes: [],
+      tiempo_minutos: tiempoTotalTanda,
+      hora_inicio: primerHijo?.hora_inicio,
+      hora_fin: ultimoHijo?.hora_fin,
+      hijos: itemsDeLaTanda,
+    });
+  });
+
+  return reporteCompleto;
 }
+

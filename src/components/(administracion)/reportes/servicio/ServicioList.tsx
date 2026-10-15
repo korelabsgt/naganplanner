@@ -58,14 +58,16 @@ export default function ServicioList({ initialConfig, initialPlantillas = [] }: 
     if (!fecha) return;
     try {
       let h = parseInt(hora, 10);
-      if (h > 24) h = 24;
-      if (h <= 12) {
-        if (ampm === 'PM' && h !== 12) h += 12;
-        if (ampm === 'AM' && h === 12) h = 0;
-      }
-      const [y, m, d] = fecha.split('-').map(Number);
-      const dateObj = new Date(y, m - 1, d, h, parseInt(minuto, 10), 0);
-      setFechaBuscada(dateObj.toISOString());
+      if (h > 12) h = 12;
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+
+      const hh = String(h).padStart(2, '0');
+      const mm = String(minuto).padStart(2, '0');
+      
+      // La base de datos guarda las horas de Guatemala con offset -06:00
+      const fechaConOffset = `${fecha}T${hh}:${mm}:00-06:00`;
+      setFechaBuscada(fechaConOffset);
     } catch {
       // Fallback si falla el parseo
     }

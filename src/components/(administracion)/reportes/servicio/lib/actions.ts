@@ -364,10 +364,16 @@ export async function generarReporteServicio(
   if (plantillaConfig.length === 0) return [];
 
   // 2. Buscar si la actividad de fechaHora pertenece a un grupo (group_id)
+  // Calculamos la ventana de tiempo para encontrar la actividad objetivo (margen de 1 minuto)
+  const fechaObjetivo = new Date(fechaHora);
+  const inicioVentana = new Date(fechaObjetivo.getTime() - 60000).toISOString();
+  const finVentana = new Date(fechaObjetivo.getTime() + 60000).toISOString();
+
   const { data: actividadInicial } = await supabase
     .from('act_actividades')
     .select('id, group_id, due_date')
-    .eq('due_date', fechaHora)
+    .gte('due_date', inicioVentana)
+    .lte('due_date', finVentana)
     .limit(1)
     .maybeSingle();
 
@@ -392,8 +398,8 @@ export async function generarReporteServicio(
   if (actividadInicial?.group_id) {
     queryActividades = queryActividades.eq('group_id', actividadInicial.group_id);
   } else {
-    // Si no tiene grupo, traer las que coincidan exactamente con la fechaHora
-    queryActividades = queryActividades.eq('due_date', fechaHora);
+    // Si no tiene grupo, buscar las que caigan en la misma ventana de fecha y hora
+    queryActividades = queryActividades.gte('due_date', inicioVentana).lte('due_date', finVentana);
   }
 
   const { data: actividadesRaw } = await queryActividades.order('due_date', { ascending: true });
@@ -427,7 +433,8 @@ export async function generarReporteServicio(
     for (const act of actsDeEsteHorario) {
       const integrantes = (act.act_integrantes ?? []) as any[];
       for (const i of integrantes) {
-        if (i.invitación !== true) continue;
+        // Excluimos solo si fue explícitamente rechazado (false). Aceptamos true y null (pendiente)
+        if (i.invitación === false) continue;
 
         const perfil = profilesMap.get(i.usuario_id);
         const persona = {
@@ -500,7 +507,9 @@ export async function generarReporteServicio(
 
   // Si solo hay un horario o la plantilla NO tiene marcado multi-horario, procesamos únicamente la hora seleccionada
   if (listaHorarios.length <= 1 || !permiteMultiHorario) {
-    return procesarTanda(fechaHora, 0, false);
+    // Si encontramos actividades en la base de datos, usamos su due_date exacto; si no, el fechaHora de fallback
+    const targetHora = listaHorarios[0] || fechaHora;
+    return procesarTanda(targetHora, 0, false);
   }
 
   // Si hay MÚLTIPLES horarios (Grupo de servicios en la misma fecha)

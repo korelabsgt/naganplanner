@@ -15,7 +15,7 @@ export default async function ReunionPage() {
   
   return (
     <div className="w-full">
-      <Suspense fallback={<div className="p-10 text-center text-gray-500">Cargando reuniones y eventos...</div>}>
+      <Suspense fallback={<div className="p-10 text-center text-gray-500">Cargando servicios, reuniones y eventos...</div>}>
         <GestorPlanificador 
           tipoVista={esAdmin ? "todas" : "mis_actividades"} 
           modulo="reunion"

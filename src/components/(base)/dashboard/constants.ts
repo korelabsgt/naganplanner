@@ -45,7 +45,7 @@ export const TODOS_LOS_MODULOS: Modulo[] = [
   },
   {
     id: 'REUNION',
-    titulo: 'Reuniones y Eventos',
+    titulo: 'Servicios, Reuniones y Eventos',
     descripcion: 'Gestión general de reuniones ministeriales.',
     ruta: '/kore/planificador/reunion',
     iconKey: 'vqkaxtlm',

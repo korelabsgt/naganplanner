@@ -18,6 +18,7 @@ interface Props {
   actividadId: string;
 }
 
+
 export default function FilaIntegrante({
   integrante,
   usuarioActualId,
@@ -164,8 +165,8 @@ export default function FilaIntegrante({
               disabled={loadingGeo !== null}
               onClick={() => handleMarcar(!entrada ? 'entrada' : 'salida')}
               className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg sm:rounded-md transition-all font-bold text-xs sm:text-[10px] uppercase tracking-wider ${!entrada
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 sm:bg-blue-50 sm:text-blue-600 sm:shadow-none sm:hover:bg-blue-100 dark:bg-blue-600/30 dark:text-blue-300 dark:hover:bg-blue-600/50'
-                  : 'bg-orange-600 text-white hover:bg-orange-700 shadow-md shadow-orange-500/20 sm:bg-orange-50 sm:text-orange-600 sm:shadow-none sm:hover:bg-orange-100 dark:bg-orange-600/30 dark:text-orange-300 dark:hover:bg-orange-600/50'
+                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 sm:bg-blue-50 sm:text-blue-600 sm:shadow-none sm:hover:bg-blue-100 dark:bg-blue-600/30 dark:text-blue-300 dark:hover:bg-blue-600/50'
+                : 'bg-orange-600 text-white hover:bg-orange-700 shadow-md shadow-orange-500/20 sm:bg-orange-50 sm:text-orange-600 sm:shadow-none sm:hover:bg-orange-100 dark:bg-orange-600/30 dark:text-orange-300 dark:hover:bg-orange-600/50'
                 }`}
             >
               {loadingGeo ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} className="opacity-80" />}

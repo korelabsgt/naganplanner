@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import GestorPlanificador from "@/components/(administracion)/planificador/GestorPlanificador";
 
-// Solo ADMIN, SUPER y RRHH pueden ver todas las actividades
-const ROLES_PERMITIDOS = ['admin', 'super', 'rrhh'];
+// Solo ADMIN y SUPER pueden ver todas las actividades
+const ROLES_PERMITIDOS = ['admin', 'super'];
 
 export default async function PlanificadorAdminPage() {
   const supabase = await createClient();

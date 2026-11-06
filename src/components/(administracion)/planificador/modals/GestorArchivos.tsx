@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { FileText, Trash2, Eye, UploadCloud, X, Loader2, Paperclip, Download } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import Swal from 'sweetalert2';
-import { usePlanificadorMutations } from '../lib/hooks'; // Importamos el hook
-import { Adjunto } from '../lib/zod'; // Usamos el tipo centralizado de zod
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks'; // Importamos el hook
+import { Adjunto } from '@/components/(administracion)/planificador/lib/zod'; // Usamos el tipo centralizado de zod
 
 interface Props {
   actividadId: string;

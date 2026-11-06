@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { HardDrive, Check, Trash2, Plus, Loader2, Eye, X, ExternalLink } from 'lucide-react';
-import { usePlanificadorMutations } from '../lib/hooks';
-import { ArchivoDrive } from '../lib/zod';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
+import { ArchivoDrive } from '@/components/(administracion)/planificador/lib/zod';
 import Swal from 'sweetalert2';
 
 interface Props {

@@ -195,3 +195,42 @@
   cursor: pointer !important;
 }
 
+/* Ocultar barra de scroll lateral manteniendo el scroll activo y funcional (Cross-Browser & iOS WebKit) */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece,
+::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-corner,
+::-webkit-resizer {
+  display: none !important;
+  background: transparent !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body,
+* {
+  scrollbar-width: none !important; /* Firefox y estándares modernos */
+  -ms-overflow-style: none !important; /* IE y Edge antiguos */
+}
+
+/* Soporte específico para iOS / Safari */
+.scrollbar-hide {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}

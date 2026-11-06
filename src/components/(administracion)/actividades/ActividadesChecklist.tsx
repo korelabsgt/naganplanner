@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Check, Edit2, Trash2, Plus, Loader2, X, Save } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { useActividadMutations } from './lib/hooks';
-import { ChecklistItem } from './lib/zod';
+import { useActividadMutations } from '@/components/(administracion)/actividades/lib/hooks';
+import { ChecklistItem } from '@/components/(administracion)/actividades/lib/zod';
 
 interface Props {
   actividadId: string;

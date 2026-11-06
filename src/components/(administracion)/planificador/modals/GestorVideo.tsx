@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Youtube, Check, Play, Trash2, Plus, Loader2 } from 'lucide-react';
-import { usePlanificadorMutations } from '../lib/hooks'; // Importamos el hook
-import { VideoAdjunto } from '../lib/zod';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks'; // Importamos el hook
+import { VideoAdjunto } from '@/components/(administracion)/planificador/lib/zod';
 import Swal from 'sweetalert2';
 
 interface Props {

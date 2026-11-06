@@ -6,8 +6,8 @@ import {
   Clock, AlertCircle, Copy, CheckCircle2, CalendarDays, Ban, Loader2
 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { Actividad, Perfil, ChecklistItem } from './lib/zod';
-import { useActividadMutations } from './lib/hooks';
+import { Actividad, Perfil, ChecklistItem } from '@/components/(administracion)/actividades/lib/zod';
+import { useActividadMutations } from '@/components/(administracion)/actividades/lib/hooks';
 import ActividadesChecklist from './ActividadesChecklist';
 import NuevaActividad from './modals/NuevaActividad';
 import DuplicarActividad from './modals/DuplicarActividad';
@@ -160,7 +160,7 @@ export default function ActividadItem({
 
   return (
     <>
-      <div className={`
+      <div id={`actividad-${actividad.id}`} className={`
         group rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col
         ${getStatusColor()} 
         ${isExpanded ? 'ring-2 ring-[#d6a738]/30 shadow-lg' : 'hover:shadow-md border-gray-200 dark:border-[#3e3630]'}

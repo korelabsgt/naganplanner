@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 import { ArrowLeft, Plus, Trash2, Pencil, ChevronUp, ChevronDown, Save, Loader2, Settings, Layers, Check, ChevronsUpDown } from 'lucide-react';
 import { ConfigProgramaServicio, ConfigProgramaForm, AjustesGlobalesForm, PlantillaServicio, PlantillaServicioForm } from '../lib/zod';
 import { 
@@ -11,13 +12,11 @@ import {
 } from '../lib/hooks';
 import { useRolesSugeridos } from '../../../planificador/lib/hooks';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
 interface Props {
   onBack: () => void;
   initialConfig: ConfigProgramaServicio[];
   initialPlantillas?: PlantillaServicio[];
 }
-
 const MODULOS_DISPONIBLES = [
   { value: 'alabanza', label: 'Alabanza' },
   { value: 'danza-damas', label: 'Danza Damas' },
@@ -25,13 +24,11 @@ const MODULOS_DISPONIBLES = [
   { value: 'multimedia', label: 'Multimedia' },
   { value: 'reunion', label: 'Reunión' },
 ];
-
 const TIPO_OPCIONES = [
   { value: 'agrupador', label: 'Agrupador (Título con subpuntos)', color: '#F8AC32' },
   { value: 'rol', label: 'Rol (persona por rol)', color: 'blue' },
   { value: 'dependencia', label: 'Dependencia (módulo/departamento)', color: 'emerald' },
 ] as const;
-
 const FORM_VACIO: ConfigProgramaForm = {
   parent_id: null,
   orden: 1,
@@ -39,7 +36,6 @@ const FORM_VACIO: ConfigProgramaForm = {
   nombre_mostrar: '',
   tiempo_minutos: 10,
 };
-
 export default function VistaConfigurarPrograma({ onBack, initialConfig, initialPlantillas = [] }: Props) {
   // Manejo de Plantillas
   const { data: plantillas = initialPlantillas, isLoading: cargandoPlantillas } = usePlantillasServicio();
@@ -48,19 +44,15 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
   const [plantillaActivaId, setPlantillaActivaId] = useState<string | undefined>(() => {
     return initialPlantillas[0]?.id;
   });
-
   // Si cargan plantillas y no hay activa, asignar la primera
   useEffect(() => {
     if (plantillas.length > 0 && !plantillaActivaId) {
       setPlantillaActivaId(plantillas[0].id);
     }
   }, [plantillas, plantillaActivaId]);
-
   const plantillaActual = plantillas.find(p => p.id === plantillaActivaId);
-
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [isTipoServicioPopoverOpen, setIsTipoServicioPopoverOpen] = useState(false);
-
   // Estados modal/formulario de Plantilla
   const [editandoPlantilla, setEditandoPlantilla] = useState(false);
   const [creandoPlantilla, setCreandoPlantilla] = useState(false);
@@ -70,39 +62,32 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
     minutos_preparacion_previa: 60,
     permite_multi_horario: false,
   });
-
   // Configuración de bloques scoped a la plantilla activa (no pasar initialConfig global para que cargue los puntos de la plantilla)
   const { data: config } = useConfigPrograma(plantillaActivaId);
   const { confirmarEliminar, guardarItem, moverOrden, notificar, isLoading } = useConfigProgramaLogic(plantillaActivaId);
   const { data: rolesSugeridos = [] } = useRolesSugeridos();
-
   const [modoForm, setModoForm] = useState<'nuevo' | 'editar' | null>(null);
   const [itemEditando, setItemEditando] = useState<ConfigProgramaServicio | null>(null);
   const [form, setForm] = useState<ConfigProgramaForm>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
-
   // Ajustes Globales (Nombre de iglesia)
   const { data: ajustes, isLoading: cargandoAjustes } = useAjustesGlobales();
   const { guardar: guardarAjustes, isLoading: guardandoAjustes } = useAjustesGlobalesMutaciones();
   const [editandoAjustes, setEditandoAjustes] = useState(false);
-  const [formAjustes, setFormAjustes] = useState<AjustesGlobalesForm>({ nombre_iglesia: '', minutos_preparacion_previa: 60 });
-
+  const [formAjustes, setFormAjustes] = useState<AjustesGlobalesForm>({ nombre_iglesia: '' });
   useEffect(() => {
     if (ajustes && !editandoAjustes) {
       setFormAjustes({
         nombre_iglesia: ajustes.nombre_iglesia,
-        minutos_preparacion_previa: ajustes.minutos_preparacion_previa
       });
     }
   }, [ajustes, editandoAjustes]);
-
   const submitAjustes = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAjustes.nombre_iglesia.trim()) return;
     await guardarAjustes.mutateAsync(formAjustes);
     setEditandoAjustes(false);
   };
-
   const handleCrearPlantilla = () => {
     setFormPlantilla({
       nombre: '',
@@ -112,7 +97,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
     });
     setCreandoPlantilla(true);
   };
-
   const handleEditarPlantilla = (p: PlantillaServicio) => {
     setFormPlantilla({
       nombre: p.nombre,
@@ -122,7 +106,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
     });
     setEditandoPlantilla(true);
   };
-
   const handleGuardarPlantilla = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPlantilla.nombre.trim()) return;
@@ -131,7 +114,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
       data: formPlantilla,
       id: editandoPlantilla ? plantillaActivaId : undefined,
     });
-
     if (res.ok && res.data) {
       setPlantillaActivaId(res.data.id);
       setCreandoPlantilla(false);
@@ -141,13 +123,35 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
       notificar('error', 'Error al guardar plantilla', res.error);
     }
   };
-
   const handleEliminarPlantilla = async () => {
     if (!plantillaActual) return;
     if (plantillas.length <= 1) {
       notificar('warning', 'No puedes eliminar la única plantilla existente');
       return;
     }
+    const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+    const swalBg = isDarkMode ? '#1a1a1a' : '#ffffff';
+    const swalText = isDarkMode ? '#f3f4f6' : '#1f2937';
+    const resultado = await Swal.fire({
+      icon: 'warning',
+      title: '¿Eliminar plantilla?',
+      html: `<p>¿Estás seguro de eliminar la plantilla <strong>${plantillaActual.nombre}</strong>?</p><p class="text-xs text-red-500 mt-2">Esta acción eliminará la plantilla y toda la configuración de sus puntos de programa. No se puede deshacer.</p>`,
+      background: swalBg,
+      color: swalText,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar plantilla',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#ef4444',
+      customClass: {
+        popup: 'rounded-3xl shadow-2xl border border-gray-100 dark:border-neutral-800',
+        title: 'text-xl font-black pt-4',
+        htmlContainer: 'text-sm text-gray-500 dark:text-gray-400',
+        actions: 'flex gap-3 justify-center mt-6 pb-4 w-full flex-wrap',
+        cancelButton:
+          'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-neutral-700 font-bold rounded-xl px-6 py-2.5 transition-all',
+      },
+    });
+    if (!resultado.isConfirmed) return;
     const res = await eliminarPlantilla.mutateAsync(plantillaActual.id);
     if (res.ok) {
       const restante = plantillas.find(p => p.id !== plantillaActual.id);
@@ -157,7 +161,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
       notificar('error', 'Error al eliminar', res.error);
     }
   };
-
   // Aplanar árbol para mostrar en lista con indentación
   const aplanarItems = (items: ConfigProgramaServicio[], nivel = 0): (ConfigProgramaServicio & { nivel: number })[] => {
     return items.flatMap((item) => [
@@ -165,10 +168,8 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
       ...aplanarItems(item.hijos ?? [], nivel + 1),
     ]);
   };
-
   const itemsPlanos = aplanarItems(config ?? []);
   const itemsRaiz = (config ?? []).filter((i) => !i.parent_id);
-
   const abrirNuevo = (parentId?: string) => {
     const hermanos = parentId
       ? (config ?? []).flatMap((i) => i.hijos ?? []).filter((i) => i.parent_id === parentId)
@@ -182,7 +183,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
     setItemEditando(null);
     setModoForm('nuevo');
   };
-
   const abrirEditar = (item: ConfigProgramaServicio) => {
     setForm({
       plantilla_id: item.plantilla_id ?? plantillaActivaId,
@@ -195,28 +195,23 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
     setItemEditando(item);
     setModoForm('editar');
   };
-
   const cancelarForm = () => {
     setModoForm(null);
     setItemEditando(null);
     setForm(FORM_VACIO);
   };
-
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre_mostrar.trim()) return;
     setGuardando(true);
-
     const payload = {
       ...form,
       plantilla_id: plantillaActivaId,
     };
-
     const ok = await guardarItem(payload, itemEditando?.id);
     setGuardando(false);
     if (ok) cancelarForm();
   };
-
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6 pb-28 animate-in fade-in slide-in-from-bottom-4 duration-300">
       
@@ -238,7 +233,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
           </p>
         </div>
       </div>
-
       {/* SECCIÓN: Selector y Gestor de Plantillas */}
       <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -256,7 +250,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
             Nueva Plantilla
           </button>
         </div>
-
         {/* Formulario Crear/Editar Plantilla */}
         {(creandoPlantilla || editandoPlantilla) ? (
           <form onSubmit={handleGuardarPlantilla} className="p-4 bg-gray-50 dark:bg-neutral-950/60 rounded-xl border border-gray-200 dark:border-neutral-800 space-y-4">
@@ -447,7 +440,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
           </div>
         )}
       </div>
-
       {/* Ajustes Globales */}
       <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-gray-50 dark:border-neutral-800/50 flex items-center justify-between">
@@ -471,8 +463,8 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
               <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
             </div>
           ) : editandoAjustes ? (
-            <form onSubmit={submitAjustes} className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
+            <form onSubmit={submitAjustes} className="flex flex-col sm:flex-row items-end gap-4">
+              <div className="flex-1 w-full">
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
                   Nombre de Iglesia
                 </label>
@@ -485,21 +477,7 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                   placeholder="Ej. KORE Church"
                 />
               </div>
-              <div className="w-full sm:w-48">
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Retraso inicio (min)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={formAjustes.minutos_preparacion_previa}
-                  onChange={e => setFormAjustes({ ...formAjustes, minutos_preparacion_previa: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm focus:ring-2 focus:ring-[#F8AC32] outline-none"
-                  placeholder="Ej. 60"
-                />
-              </div>
-              <div className="flex items-end gap-2 mt-4 sm:mt-0">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setEditandoAjustes(false)}
@@ -518,24 +496,17 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
               </div>
             </form>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-gray-50 dark:bg-neutral-950/50 p-4 rounded-xl border border-gray-100 dark:border-neutral-800/60 flex flex-col items-center justify-center text-center">
-                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">Nombre de Iglesia</p>
+            <div className="bg-gray-50 dark:bg-neutral-950/50 p-4 rounded-xl border border-gray-100 dark:border-neutral-800/60 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">Nombre de Iglesia</p>
                 <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-gray-100">
                   {ajustes?.nombre_iglesia || 'No configurado'}
-                </p>
-              </div>
-              <div className="bg-gray-50 dark:bg-neutral-950/50 p-4 rounded-xl border border-gray-100 dark:border-neutral-800/60 flex flex-col items-center justify-center text-center">
-                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">Retraso de Inicio</p>
-                <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-gray-100">
-                  {ajustes?.minutos_preparacion_previa} minutos después
                 </p>
               </div>
             </div>
           )}
         </div>
       </div>
-
       <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm overflow-hidden">
         <div className="p-5 space-y-4">
           
@@ -551,7 +522,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
               </button>
             </div>
           )}
-
           {/* Lista de ítems */}
           {itemsPlanos.length === 0 && !modoForm && (
             <div className="text-center py-12 text-gray-400 dark:text-gray-600">
@@ -559,7 +529,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
               <p className="text-xs mt-1">Agrega el primer punto para comenzar.</p>
             </div>
           )}
-
           {itemsPlanos.length > 0 && (
             <div className="space-y-2">
               {itemsPlanos.map((item) => {
@@ -570,7 +539,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                       (i) => i.parent_id === item.parent_id && i.nivel === item.nivel
                     );
                 const indexEnNivel = hermanosDelNivel.findIndex((i) => i.id === item.id);
-
                 return (
                   <div
                     key={item.id}
@@ -593,7 +561,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                         <ChevronDown className="w-3.5 h-3.5" />
                       </button>
                     </div>
-
                     {/* Badge número */}
                     <span
                       className={`
@@ -608,7 +575,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                     >
                       {item.orden}
                     </span>
-
                     {/* Nombre */}
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium text-gray-800 dark:text-gray-200 truncate ${item.nivel > 0 ? 'text-xs' : ''}`}>
@@ -620,10 +586,8 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                           : `${item.tipo_elemento === 'rol' ? 'Rol' : 'Dependencia'} · ${item.tiempo_minutos ?? 0} min`}
                       </p>
                     </div>
-
                     {/* Acciones */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-
                       {item.tipo_elemento === 'agrupador' && (
                         <button
                           onClick={() => abrirNuevo(item.id)}
@@ -653,7 +617,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
               })}
             </div>
           )}
-
           {/* Formulario Modal */}
           {modoForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -664,14 +627,12 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-neutral-800 pb-3">
                   {modoForm === 'nuevo' ? 'Agregar nuevo punto' : 'Editar punto'}
                 </h3>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                     Nombre a mostrar *
                   </label>
-
                   {form.tipo_elemento === 'agrupador' && (
                     <input
                       type="text"
@@ -682,7 +643,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                       className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F8AC32] transition-all"
                     />
                   )}
-
                   {form.tipo_elemento === 'rol' && (
                     <select
                       value={form.nombre_mostrar}
@@ -696,7 +656,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                       ))}
                     </select>
                   )}
-
                   {form.tipo_elemento === 'dependencia' && (
                     <select
                       value={form.nombre_mostrar}
@@ -711,7 +670,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                     </select>
                   )}
                 </div>
-
                 {/* Tipo de elemento */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
@@ -735,7 +693,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                     ))}
                   </select>
                 </div>
-
                 {/* Tiempo (no para agrupador) */}
                 {form.tipo_elemento !== 'agrupador' && (
                   <div>
@@ -755,7 +712,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                   </div>
                 )}
               </div>
-
               {/* Acciones del formulario */}
               <div className="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-neutral-800">
                 <button
@@ -777,7 +733,6 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
             </form>
           </div>
           )}
-
         </div>
       </div>
     </div>

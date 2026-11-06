@@ -1,34 +1,42 @@
 import { createClient } from "@/utils/supabase/server";
 import { Dashboard } from "@/components/(base)/dashboard";
+import { obtenerActividadesCalendario } from "@/components/(base)/dashboard/calendar/actions";
+import { getEffectiveRole } from "@/lib/auth-role";
 
 async function getUserIsJefe(userId: string): Promise<boolean> {
   const supabase = await createClient();
 
   // Verifica si tiene un puesto de jefatura
   const { data: puestosJefatura } = await supabase
-    .from('puesto')
-    .select('id')
-    .eq('usuario_id', userId)
-    .eq('es_jefatura', true);
+    .from("puesto")
+    .select("id")
+    .eq("usuario_id", userId)
+    .eq("es_jefatura", true);
 
-  // Verifica si es ADMIN, SUPER o RRHH (también cuentan como jefes)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('rol')
-    .eq('id', userId)
-    .single();
-
-  const esJefeOperativo = puestosJefatura && puestosJefatura.length > 0;
-  const esSuperAdmin = ['admin', 'super', 'rrhh'].includes(profile?.rol?.toLowerCase() ?? '');
+  const { effectiveRole } = await getEffectiveRole(supabase, { id: userId });
+  const esJefeOperativo = Boolean(puestosJefatura && puestosJefatura.length > 0);
+  const esSuperAdmin = ["admin", "super"].includes(effectiveRole);
 
   return esJefeOperativo || esSuperAdmin;
 }
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const isJefe = user ? await getUserIsJefe(user.id) : false;
+  const [isJefe, calendarData] = await Promise.all([
+    user ? getUserIsJefe(user.id) : Promise.resolve(false),
+    obtenerActividadesCalendario(),
+  ]);
 
-  return <Dashboard isJefe={isJefe} />;
+  return (
+    <Dashboard
+      isJefe={isJefe}
+      calendarEvents={calendarData.events}
+      canViewAll={calendarData.canViewAll}
+      userRole={calendarData.userRole}
+    />
+  );
 }

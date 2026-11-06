@@ -12,6 +12,8 @@ import {
   PhoneCall,
   LayoutGrid,
   LogIn,
+  ShieldAlert,
+  ChevronDown,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -21,11 +23,36 @@ import { AuroraText } from "@/components/ui/aurora-text";
 import { PushNotificationToggle } from "@/components/ui/PushNotificationToggle";
 import { RefreshButton } from "@/components/ui/RefreshButton";
 import { BreadcrumbNav } from "@/components/ui/breadcrumb-nav";
+import { getSimulatedRoleState, setSimulatedRole } from "@/lib/auth-role-actions";
 
 
 export default function Header() {
   const user = useUser();
   const [isOpen, setIsOpen] = useState(false);
+  const [simulationState, setSimulationState] = useState<{
+    canSimulate: boolean;
+    realRole: string;
+    effectiveRole: string;
+  }>({
+    canSimulate: false,
+    realRole: "user",
+    effectiveRole: "user",
+  });
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      getSimulatedRoleState().then((res) => {
+        setSimulationState(res);
+      });
+    }
+  }, [user]);
+
+  const handleRoleChange = async (newRole: string) => {
+    setIsUpdatingRole(true);
+    await setSimulatedRole(newRole);
+    window.location.reload();
+  };
 
   useEffect(() => {
     console.log("Header (desde Context):", user);
@@ -37,7 +64,8 @@ export default function Header() {
   const username = metadata.nombre || user?.email?.split("@")[0] || "Invitado";
 
   const initial = username.charAt(0).toUpperCase();
-  const canManageProfiles = ["super", "admin", "rrhh"].includes(userRole);
+  const activeRole = simulationState.canSimulate ? simulationState.effectiveRole : userRole;
+  const canManageProfiles = ["super", "admin"].includes(activeRole);
 
   const publicLinks = [
     { href: "#inventory", label: "Inventory", icon: CarFront },
@@ -120,8 +148,13 @@ export default function Header() {
                     <p className="text-sm font-bold text-foreground leading-none truncate">
                       Usuario: <span className="underline">{username}</span>
                     </p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-medium truncate mt-1">
-                      Rol: <span className="underline">{userRole}</span>
+                    <p className="text-[10px] text-muted-foreground uppercase font-medium truncate mt-1 flex items-center gap-1.5 flex-wrap">
+                      <span>Rol: <span className="underline">{userRole}</span></span>
+                      {simulationState.canSimulate && simulationState.effectiveRole !== "super" && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[9px] font-bold border border-amber-500/40">
+                          Simulando: {simulationState.effectiveRole.toUpperCase()}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -171,7 +204,47 @@ export default function Header() {
           )}
 
           <div className="mt-auto pt-6 border-t border-border/40">
-            <div className="flex flex-col space-y-6">
+            <div className="flex flex-col space-y-4">
+              {simulationState.canSimulate && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/30 shadow-inner">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                      <ShieldAlert size={15} className="shrink-0" />
+                      <span>Simulador de Roles</span>
+                    </div>
+                    {simulationState.effectiveRole !== "super" && (
+                      <button
+                        type="button"
+                        disabled={isUpdatingRole}
+                        onClick={() => handleRoleChange("super")}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 underline font-semibold cursor-pointer disabled:opacity-50"
+                      >
+                        Restaurar SUPER
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground mb-2">
+                    Prueba cómo ve y opera la plataforma cada rol:
+                  </p>
+
+                  <div className="relative">
+                    <select
+                      disabled={isUpdatingRole}
+                      value={simulationState.effectiveRole}
+                      onChange={(e) => handleRoleChange(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2 bg-neutral-900 border border-amber-500/40 rounded-xl text-xs font-bold text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer appearance-none transition-all disabled:opacity-50"
+                    >
+                      <option value="super">👑 Super Administrador (Real)</option>
+                      <option value="admin">🛡️ Administrador (Admin)</option>
+                      <option value="user">👤 Miembro / Usuario Regular</option>
+                    </select>
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-amber-400">
+                      <ChevronDown size={14} />
+                    </div>
+                  </div>
+                </div>
+              )}
               <motion.div
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings, FileText, Calendar, Clock, Eye, Loader2, AlertCircle, Sparkles, Layers, Check, ChevronsUpDown } from 'lucide-react';
 import { ConfigProgramaServicio, PlantillaServicio } from './lib/zod';
 import { useReporteServicio, usePlantillasServicio } from './lib/hooks';
@@ -41,7 +41,7 @@ export default function ServicioList({ initialConfig, initialPlantillas = [] }: 
   }, [plantillas, plantillaSeleccionada]);
 
   const [fecha, setFecha] = useState('');
-  const [hora, setHora] = useState('00');
+  const [hora, setHora] = useState('12');
   const [minuto, setMinuto] = useState('00');
   const [ampm, setAmpm] = useState('PM');
   const [fechaBuscada, setFechaBuscada] = useState<string | null>(null);
@@ -53,6 +53,168 @@ export default function ServicioList({ initialConfig, initialPlantillas = [] }: 
     fechaBuscada, 
     plantillaSeleccionada || null
   );
+
+  const timePickerRef = useRef<HTMLDivElement>(null);
+  const horaRef = useRef<HTMLInputElement>(null);
+  const minutoRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (timePickerRef.current && !timePickerRef.current.contains(e.target as Node)) {
+        setIsTimePickerOpen(false);
+      }
+    };
+    if (isTimePickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isTimePickerOpen]);
+
+  const handleHoraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '');
+    if (val === '') {
+      setHora('');
+      return;
+    }
+
+    let digits = val;
+    if (digits.length > 2) {
+      digits = digits.slice(-1);
+    }
+    const n = parseInt(digits, 10);
+
+    if (digits.length === 1) {
+      if (n >= 2 && n <= 9) {
+        setHora(`0${n}`);
+      } else {
+        setHora(digits);
+      }
+      return;
+    }
+
+    if (n >= 1 && n <= 12) {
+      setHora(String(n).padStart(2, '0'));
+    } else if (n === 0) {
+      setHora('12');
+    } else {
+      const last = digits.slice(-1);
+      const lastN = parseInt(last, 10);
+      if (lastN >= 1 && lastN <= 12) {
+        setHora(`0${lastN}`);
+      } else {
+        setHora('12');
+      }
+    }
+  };
+
+  const handleHoraKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === ':' || e.key === 'Enter') {
+      e.preventDefault();
+      minutoRef.current?.focus();
+      minutoRef.current?.select();
+    } else if (e.key === 'Escape') {
+      setIsTimePickerOpen(false);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const current = parseInt(hora || '0', 10);
+      const next = current >= 12 ? 1 : current + 1;
+      setHora(String(next).padStart(2, '0'));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const current = parseInt(hora || '0', 10);
+      const next = current <= 1 ? 12 : current - 1;
+      setHora(String(next).padStart(2, '0'));
+    } else if (e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      setAmpm('AM');
+    } else if (e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      setAmpm('PM');
+    }
+  };
+
+  const handleHoraBlur = () => {
+    if (!hora || hora === '') {
+      setHora('12');
+      return;
+    }
+    const n = parseInt(hora, 10);
+    if (isNaN(n) || n === 0) {
+      setHora('12');
+    } else {
+      const clamped = Math.min(12, Math.max(1, n));
+      setHora(String(clamped).padStart(2, '0'));
+    }
+  };
+
+  const handleMinutoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '');
+    if (val === '') {
+      setMinuto('');
+      return;
+    }
+    let digits = val;
+    if (digits.length > 2) {
+      digits = digits.slice(-1);
+    }
+    const n = parseInt(digits, 10);
+    if (digits.length === 1) {
+      if (n >= 6 && n <= 9) {
+        setMinuto(`0${n}`);
+      } else {
+        setMinuto(digits);
+      }
+      return;
+    }
+    if (n >= 0 && n <= 59) {
+      setMinuto(String(n).padStart(2, '0'));
+    } else {
+      const last = digits.slice(-1);
+      setMinuto(`0${last}`);
+    }
+  };
+
+  const handleMinutoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && (!minuto || minuto.length === 0)) {
+      e.preventDefault();
+      horaRef.current?.focus();
+      horaRef.current?.select();
+    } else if (e.key === 'Escape') {
+      setIsTimePickerOpen(false);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const current = parseInt(minuto || '0', 10);
+      const next = current >= 59 ? 0 : current + 1;
+      setMinuto(String(next).padStart(2, '0'));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const current = parseInt(minuto || '0', 10);
+      const next = current <= 0 ? 59 : current - 1;
+      setMinuto(String(next).padStart(2, '0'));
+    } else if (e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      setAmpm('AM');
+    } else if (e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      setAmpm('PM');
+    }
+  };
+
+  const handleMinutoBlur = () => {
+    if (!minuto || minuto === '') {
+      setMinuto('00');
+      return;
+    }
+    const n = parseInt(minuto, 10);
+    if (isNaN(n)) {
+      setMinuto('00');
+    } else {
+      const clamped = Math.min(59, Math.max(0, n));
+      setMinuto(String(clamped).padStart(2, '0'));
+    }
+  };
 
   const handleBuscar = () => {
     if (!fecha) return;
@@ -185,88 +347,158 @@ export default function ServicioList({ initialConfig, initialPlantillas = [] }: 
                   onChange={(e) => setFecha(e.target.value)}
                   className="flex-1 px-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-950 text-gray-800 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#F8AC32] transition-all"
                 />
-                <div className="relative">
+                <div ref={timePickerRef} className="relative">
                   <div 
-                    onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
-                    className="relative flex items-center bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-700 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#F8AC32] transition-all shrink-0 cursor-pointer hover:border-[#F8AC32]/50"
+                    onClick={(e) => {
+                      setIsTimePickerOpen(true);
+                      const target = e.target as HTMLElement;
+                      if (target.tagName !== 'INPUT' && target.tagName !== 'BUTTON' && !target.closest('button')) {
+                        horaRef.current?.focus();
+                        horaRef.current?.select();
+                      }
+                    }}
+                    className="relative flex items-center bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-700 rounded-xl px-3 py-2 sm:py-2.5 focus-within:ring-2 focus-within:ring-[#F8AC32] focus-within:border-transparent transition-all shrink-0 cursor-text hover:border-[#F8AC32]/50"
                   >
-                    <div className="flex items-center pointer-events-none">
-                      <span className="w-5 text-center text-sm font-medium text-gray-800 dark:text-gray-100">{hora || '12'}</span>
-                      <span className="text-gray-400 font-bold mx-1">:</span>
-                      <span className="w-5 text-center text-sm font-medium text-gray-800 dark:text-gray-100">{minuto || '00'}</span>
-                      <span className="text-sm font-bold text-[#F8AC32] pl-2">{ampm}</span>
-                    </div>
+                    <input
+                      ref={horaRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={hora}
+                      onChange={handleHoraChange}
+                      onKeyDown={handleHoraKeyDown}
+                      onBlur={handleHoraBlur}
+                      onFocus={(e) => {
+                        setIsTimePickerOpen(true);
+                        e.target.select();
+                      }}
+                      onClick={(e) => {
+                        (e.target as HTMLInputElement).select();
+                      }}
+                      className="w-7 sm:w-8 text-center text-sm font-semibold bg-transparent text-gray-800 dark:text-gray-100 outline-none p-0 selection:bg-[#F8AC32]/30"
+                      placeholder="--"
+                      aria-label="Hora"
+                    />
+                    <span className="text-gray-400 font-bold mx-0.5 select-none">:</span>
+                    <input
+                      ref={minutoRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={minuto}
+                      onChange={handleMinutoChange}
+                      onKeyDown={handleMinutoKeyDown}
+                      onBlur={handleMinutoBlur}
+                      onFocus={(e) => {
+                        setIsTimePickerOpen(true);
+                        e.target.select();
+                      }}
+                      onClick={(e) => {
+                        (e.target as HTMLInputElement).select();
+                      }}
+                      className="w-7 sm:w-8 text-center text-sm font-semibold bg-transparent text-gray-800 dark:text-gray-100 outline-none p-0 selection:bg-[#F8AC32]/30"
+                      placeholder="--"
+                      aria-label="Minuto"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsTimePickerOpen(true);
+                        setAmpm((prev) => (prev === 'AM' ? 'PM' : 'AM'));
+                      }}
+                      className="text-sm font-bold text-[#F8AC32] hover:text-[#e09827] px-1 py-0.5 rounded transition-colors ml-1.5 cursor-pointer select-none"
+                      title="Clic para alternar AM / PM"
+                    >
+                      {ampm}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsTimePickerOpen((prev) => !prev);
+                      }}
+                      className="text-gray-400 hover:text-[#F8AC32] p-1 rounded-lg transition-colors ml-1 cursor-pointer"
+                      title="Abrir o cerrar selector de hora"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
                   {isTimePickerOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsTimePickerOpen(false)}></div>
-                      <div className="absolute top-full mt-2 right-0 sm:left-0 sm:right-auto bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl shadow-xl z-50 p-3 flex gap-3 min-w-[220px]">
-                        {/* Horas */}
-                        <div className="flex-1 flex flex-col items-center">
-                          <span className="text-[10px] font-bold text-gray-400 mb-2 tracking-wider">HORA</span>
-                          <div className="h-[180px] overflow-y-auto w-full flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'none' }}>
-                            {Array.from({length: 12}, (_, i) => i + 1).map(h => (
+                    <div className="absolute top-full mt-2 right-0 sm:left-0 sm:right-auto bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl shadow-xl z-50 p-3 flex gap-3 min-w-[220px]">
+                      {/* Horas */}
+                      <div className="flex-1 flex flex-col items-center">
+                        <span className="text-[10px] font-bold text-gray-400 mb-2 tracking-wider">HORA</span>
+                        <div className="h-[180px] overflow-y-auto w-full flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'none' }}>
+                          {Array.from({length: 12}, (_, i) => i + 1).map(h => {
+                            const hStr = h.toString().padStart(2, '0');
+                            const isSelected = parseInt(hora || '0', 10) === h;
+                            return (
                               <button 
                                 key={h}
+                                type="button"
                                 onClick={() => {
-                                  setHora(h.toString().padStart(2, '0'));
+                                  setHora(hStr);
                                 }}
-                                className={`py-2 text-sm rounded-lg transition-colors ${hora === h.toString().padStart(2, '0') ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                                className={`py-2 text-sm rounded-lg transition-colors cursor-pointer ${isSelected ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
                               >
-                                {h.toString().padStart(2, '0')}
+                                {hStr}
                               </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="w-[1px] bg-gray-100 dark:bg-neutral-800/60 my-2"></div>
-
-                        {/* Minutos */}
-                        <div className="flex-1 flex flex-col items-center">
-                          <span className="text-[10px] font-bold text-gray-400 mb-2 tracking-wider">MIN</span>
-                          <div className="h-[180px] overflow-y-auto w-full flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'none' }}>
-                            {Array.from({length: 60}, (_, i) => i).map(m => (
-                              <button 
-                                key={m}
-                                onClick={() => {
-                                  setMinuto(m.toString().padStart(2, '0'));
-                                }}
-                                className={`py-2 text-sm rounded-lg transition-colors ${minuto === m.toString().padStart(2, '0') ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
-                              >
-                                {m.toString().padStart(2, '0')}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="w-[1px] bg-gray-100 dark:bg-neutral-800/60 my-2"></div>
-
-                        {/* AM / PM */}
-                        <div className="flex-1 flex flex-col items-center justify-center">
-                          <div className="w-full flex flex-col gap-2">
-                            <button 
-                              onClick={() => {
-                                setAmpm('AM');
-                                setIsTimePickerOpen(false);
-                              }}
-                              className={`py-3 text-sm rounded-lg transition-colors ${ampm === 'AM' ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
-                            >
-                              AM
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setAmpm('PM');
-                                setIsTimePickerOpen(false);
-                              }}
-                              className={`py-3 text-sm rounded-lg transition-colors ${ampm === 'PM' ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
-                            >
-                              PM
-                            </button>
-                          </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </>
+
+                      <div className="w-[1px] bg-gray-100 dark:bg-neutral-800/60 my-2"></div>
+
+                      {/* Minutos */}
+                      <div className="flex-1 flex flex-col items-center">
+                        <span className="text-[10px] font-bold text-gray-400 mb-2 tracking-wider">MIN</span>
+                        <div className="h-[180px] overflow-y-auto w-full flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'none' }}>
+                          {Array.from({length: 60}, (_, i) => i).map(m => {
+                            const mStr = m.toString().padStart(2, '0');
+                            const isSelected = parseInt(minuto || '-1', 10) === m;
+                            return (
+                              <button 
+                                key={m}
+                                type="button"
+                                onClick={() => {
+                                  setMinuto(mStr);
+                                }}
+                                className={`py-2 text-sm rounded-lg transition-colors cursor-pointer ${isSelected ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                              >
+                                {mStr}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="w-[1px] bg-gray-100 dark:bg-neutral-800/60 my-2"></div>
+
+                      {/* AM / PM */}
+                      <div className="flex-1 flex flex-col items-center justify-center">
+                        <div className="w-full flex flex-col gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setAmpm('AM');
+                            }}
+                            className={`py-3 text-sm rounded-lg transition-colors cursor-pointer ${ampm === 'AM' ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                          >
+                            AM
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setAmpm('PM');
+                            }}
+                            className={`py-3 text-sm rounded-lg transition-colors cursor-pointer ${ampm === 'PM' ? 'bg-[#F8AC32] text-white font-bold shadow-md shadow-[#F8AC32]/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium'}`}
+                          >
+                            PM
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

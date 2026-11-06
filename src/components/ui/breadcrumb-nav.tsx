@@ -17,7 +17,7 @@ function BreadcrumbNavContent() {
   const user = useUser();
   const metadata = (user as any)?.raw_user_meta_data || user?.user_metadata || {};
   const userRole = metadata.rol || "user";
-  const isManagement = ["super", "admin", "rrhh"].includes(userRole);
+  const isManagement = ["super", "admin"].includes(userRole);
 
   // Si estamos en el home, no renderizamos nada
   if (pathname === "/kore") return null;

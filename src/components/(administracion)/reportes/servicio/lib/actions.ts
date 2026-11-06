@@ -347,18 +347,33 @@ export async function generarReporteServicio(
     plantillaConfig = construirArbol(configRaw ?? []);
   }
 
-  // Fallback si no hay plantilla específica o no tiene items: buscar primera plantilla o items huérfanos
+  // Fallback si no hay plantilla específica o no tiene items: buscar primera plantilla
   if (plantillaConfig.length === 0) {
-    const ajustes = await obtenerAjustesGlobales();
-    if (retrasoMinutos === 0) {
-      retrasoMinutos = ajustes?.minutos_preparacion_previa ?? 0;
-    }
-    const { data: configRaw } = await supabase
-      .from('act_config_programa_servicio')
+    const { data: primeraPlantilla } = await supabase
+      .from('act_plantillas_servicio')
       .select('*')
-      .order('orden', { ascending: true });
+      .limit(1)
+      .maybeSingle();
 
-    plantillaConfig = construirArbol(configRaw ?? []);
+    if (primeraPlantilla) {
+      retrasoMinutos = primeraPlantilla.minutos_preparacion_previa ?? 0;
+      permiteMultiHorario = primeraPlantilla.permite_multi_horario ?? false;
+
+      const { data: configRaw } = await supabase
+        .from('act_config_programa_servicio')
+        .select('*')
+        .eq('plantilla_id', primeraPlantilla.id)
+        .order('orden', { ascending: true });
+
+      plantillaConfig = construirArbol(configRaw ?? []);
+    } else {
+      const { data: configRaw } = await supabase
+        .from('act_config_programa_servicio')
+        .select('*')
+        .order('orden', { ascending: true });
+
+      plantillaConfig = construirArbol(configRaw ?? []);
+    }
   }
 
   if (plantillaConfig.length === 0) return [];

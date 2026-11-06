@@ -15,8 +15,7 @@ export function useUsers(userRole?: string) {
       if (userRole === "super") {
       } else if (userRole === "admin") {
         query = query.neq("rol", "super");
-      } else if (userRole === "rrhh") {
-        query = query.in("rol", ["rrhh", "user"]);
+      
       } else {
         query = query.eq("id", "00000000-0000-0000-0000-000000000000");
       }

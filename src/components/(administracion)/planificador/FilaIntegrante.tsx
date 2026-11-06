@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { CheckCircle2, Ban, HelpCircle, MessageSquare, RefreshCw, Briefcase, MapPin, Loader2 } from 'lucide-react';
-import { Integrante } from './lib/zod';
-import { usePlanificadorMutations } from './lib/hooks';
+import { Integrante } from '@/components/(administracion)/planificador/lib/zod';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
 import Swal from 'sweetalert2';
 import ModalUbicacion from './modals/ModalUbicacion';
 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { X, ClipboardList, Search, ArrowLeft, Loader2, Calendar } from 'lucide-react';
-import { useRegistroSustituciones } from '../lib/hooks';
+import { useRegistroSustituciones } from '@/components/(administracion)/planificador/lib/hooks';
 
 interface Props {
   isOpen: boolean;

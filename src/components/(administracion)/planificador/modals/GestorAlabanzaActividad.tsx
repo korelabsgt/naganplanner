@@ -6,7 +6,7 @@ import {
   ChevronDown, Filter, Info, Loader2,
   CheckCircle2
 } from 'lucide-react';
-import { usePlanificadorMutations } from '../lib/hooks';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
 import { obtenerBancoAlabanzas } from '../lib/actions/alabanzas';
 import { useQuery } from '@tanstack/react-query';
 import {

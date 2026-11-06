@@ -20,7 +20,7 @@ export const authSchema = z.object({
     .regex(/[0-9]/, "Debe tener un número")
     .regex(/[^A-Za-z0-9]/, "Debe tener un símbolo (!@#$...)"),
 
-  rol: z.enum(["user", "admin", "super", "rrhh"], {
+  rol: z.enum(["user", "admin", "super"], {
     message: "Selecciona un rol válido",
   }),
 });

@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { planificadorFormSchema, PlanificadorForm } from '../zod';
 import { sendPushToUsers } from '@/utils/push-utils';
+import { getEffectiveRole } from '@/lib/auth-role';
 
 // --- FUNCIÓN HELPER: VERIFICAR SI ES JEFE O ADMIN ---
 export async function checkIsJefe(supabase: any, userId: string): Promise<boolean> {
@@ -13,17 +14,10 @@ export async function checkIsJefe(supabase: any, userId: string): Promise<boolea
     .eq('usuario_id', userId)
     .eq('es_jefatura', true);
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('rol')
-    .eq('id', userId)
-    .single();
+  const { effectiveRole } = await getEffectiveRole(supabase, { id: userId });
 
-  const esJefeOperativo = puestosJefatura && puestosJefatura.length > 0;
-
-  // Normalizar el rol para que sea insensible a mayúsculas/minúsculas
-  const userRole = (profile?.rol || '').toUpperCase();
-  const esAutorizado = userRole === 'SUPER' || userRole === 'ADMIN';
+  const esJefeOperativo = Boolean(puestosJefatura && puestosJefatura.length > 0);
+  const esAutorizado = effectiveRole === 'super' || effectiveRole === 'admin';
 
   return esJefeOperativo || esAutorizado;
 }
@@ -43,6 +37,10 @@ export async function obtenerDatosPlanificador(
 
   const perfilesMap = new Map((rawProfiles || []).map((p: any) => [p.id, p]));
   const miPerfil = perfilesMap.get(user.id);
+  const { effectiveRole } = await getEffectiveRole(supabase, user);
+  if (miPerfil) {
+    miPerfil.rol = effectiveRole;
+  }
   const isJefe = await checkIsJefe(supabase, user.id);
 
   // 2. Lógica de Filtro por Equipo

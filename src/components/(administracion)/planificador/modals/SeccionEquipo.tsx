@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Search, Users, Plus, Crown, Trash2, Briefcase, UserCircle } from 'lucide-react';
-import { Perfil } from '../lib/zod';
-import { useRolesSugeridos } from '../lib/hooks';
+import { Perfil } from '@/components/(administracion)/planificador/lib/zod';
+import { useRolesSugeridos } from '@/components/(administracion)/planificador/lib/hooks';
 import Swal from 'sweetalert2';
 
 export type IntegranteUI = {

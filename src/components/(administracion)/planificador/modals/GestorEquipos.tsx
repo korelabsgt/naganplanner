@@ -6,9 +6,9 @@ import {
   ChevronDown, Crown, UserCircle
 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { useGestorEquipos } from '../lib/hooks';
+import { useGestorEquipos } from '@/components/(administracion)/planificador/lib/hooks';
 import { SeccionEquipo, IntegranteUI } from './SeccionEquipo';
-import { Perfil } from '../lib/zod';
+import { Perfil } from '@/components/(administracion)/planificador/lib/zod';
 
 interface Props {
   isOpen: boolean;

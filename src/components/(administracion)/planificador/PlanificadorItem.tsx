@@ -6,8 +6,8 @@ import {
   Clock, AlertCircle, Ban, Mail, Paperclip, Youtube, X,
   Star, Music, Copy, BookOpen, Layers, Plus, Send
 } from 'lucide-react';
-import { Planificador, Perfil } from './lib/zod';
-import { usePlanificadorLogic, usePlanificadorMutations } from './lib/hooks';
+import { Planificador, Perfil } from '@/components/(administracion)/planificador/lib/zod';
+import { usePlanificadorLogic, usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
 import NuevoPlanificador from './modals/NuevoPlanificador';
 import FilaIntegrante from './FilaIntegrante';
 import PlanificadorChecklist from './PlanificadorChecklist';

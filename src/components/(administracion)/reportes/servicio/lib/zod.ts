@@ -139,7 +139,7 @@ export const ajustesGlobalesSchema = z.object({
 
 export const ajustesGlobalesFormSchema = z.object({
   nombre_iglesia: z.string().min(1, "El nombre de la iglesia es requerido"),
-  minutos_preparacion_previa: z.number().int().min(0, "Los minutos no pueden ser negativos"),
+  minutos_preparacion_previa: z.number().int().min(0, "Los minutos no pueden ser negativos").optional(),
 });
 
 export type AjustesGlobales = z.infer<typeof ajustesGlobalesSchema>;

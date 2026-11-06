@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Check, Plus, Trash2, BookOpen, Edit2, Loader2, X } from 'lucide-react';
-import { usePlanificadorMutations } from '../lib/hooks';
-import { DonEspiritual } from '../lib/zod';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
+import { DonEspiritual } from '@/components/(administracion)/planificador/lib/zod';
 import Swal from 'sweetalert2';
 
 interface Props {

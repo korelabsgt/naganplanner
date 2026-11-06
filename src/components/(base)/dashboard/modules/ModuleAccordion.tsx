@@ -42,9 +42,9 @@ export default function ModuleAccordion({
     <div className="flex flex-col gap-4">
       <button
         onClick={handleToggle}
-        className="flex items-center justify-between w-full px-6 py-5 text-left group transition-all bg-card/40 hover:bg-card/60 border border-border/40 rounded-2xl shadow-sm"
+        className="flex items-center justify-between w-full px-3.5 sm:px-6 py-3.5 sm:py-5 text-left group transition-all bg-card/40 hover:bg-card/60 border border-border/40 rounded-xl sm:rounded-2xl shadow-sm"
       >
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
           {iconKey && (
             <div className="w-12 h-12 rounded-xl bg-muted/30 flex items-center justify-center shrink-0">
               <AnimatedIcon iconKey={iconKey} className="w-8 h-8" />
@@ -79,7 +79,7 @@ export default function ModuleAccordion({
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-1 gap-3 pb-4 px-4 sm:px-6 mx-auto w-[98%] sm:w-[96%]">
+            <div className="grid grid-cols-1 gap-3 pb-4 px-1.5 sm:px-3 mx-auto w-full">
               {children}
             </div>
           </motion.div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, CheckSquare, MinusCircle } from 'lucide-react';
-import { ChecklistItem } from '../lib/zod';
+import { ChecklistItem } from '@/components/(administracion)/planificador/lib/zod';
 
 interface Props {
   checklist: ChecklistItem[];

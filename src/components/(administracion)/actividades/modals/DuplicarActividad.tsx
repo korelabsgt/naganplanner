@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X, Copy, Calendar, User, AlignLeft, CheckSquare, Plus, Trash2, Save, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { useActividadMutations } from '../lib/hooks';
-import { Actividad, Perfil, ActividadForm, actividadFormSchema, ChecklistItem } from '../lib/zod';
+import { useActividadMutations } from '@/components/(administracion)/actividades/lib/hooks';
+import { Actividad, Perfil, ActividadForm, actividadFormSchema, ChecklistItem } from '@/components/(administracion)/actividades/lib/zod';
 
 interface Props {
   isOpen: boolean;

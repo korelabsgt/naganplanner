@@ -265,9 +265,7 @@ export default function SignUp({ isOpen, onClose }: SignUpProps) {
                       >
                         <option value="user">Usuario (Estándar)</option>
                         <option value="admin">Administrador</option>
-                        <option value="rrhh">Recursos Humanos</option>
-                        <option value="super">Super Admin</option>
-                        <option value="alumno">Alumno</option>
+                                                <option value="super">Super Admin</option>
                       </Select>
                     </div>
 

@@ -24,7 +24,7 @@ export default async function GestorPlanificador({ tipoVista, modulo }: Props) {
   }
 
   return (
-    <div className="w-full max-width: 1600px; mx-auto px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full max-w-[1750px] mx-auto px-1 sm:px-6 lg:px-8 py-2 sm:py-6">
       <PlanificadorList 
         initialData={{
           planificadores: datos.planificadores,

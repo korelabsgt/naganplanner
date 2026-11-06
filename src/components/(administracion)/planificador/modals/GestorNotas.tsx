@@ -4,8 +4,8 @@ import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, User, Loader2, Edit2, X, Save, MoreVertical } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { NotaReunion, Perfil } from '../lib/zod';
-import { usePlanificadorMutations } from '../lib/hooks';
+import { NotaReunion, Perfil } from '@/components/(administracion)/planificador/lib/zod';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
 
 interface Props {
   actividadId: string;

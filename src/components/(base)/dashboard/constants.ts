@@ -1,5 +1,5 @@
 // Tipos de roles disponibles en el sistema (en minúscula, tal como se guardan en Supabase)
-export type Rol = 'user' | 'super' | 'admin' | 'rrhh';
+export type Rol = 'user' | 'super' | 'admin';
 
 // Tipo de un módulo del sistema
 export interface Modulo {
@@ -101,7 +101,7 @@ export const TODOS_LOS_MODULOS: Modulo[] = [
     iconKey: 'dkvquwgz',
     categoria: 'Administración',
     subgrupo: 'Organización Ministerial',
-    rolesPermitidos: ['admin', 'super', 'rrhh'],
+    rolesPermitidos: ['admin', 'super'],
   },
   {
     id: 'ESCUELAS',

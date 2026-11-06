@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Check, Edit2, Trash2, Plus, Loader2, X, Save, CheckSquare } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { usePlanificadorMutations } from './lib/hooks';
-import { ChecklistItem } from './lib/zod';
+import { usePlanificadorMutations } from '@/components/(administracion)/planificador/lib/hooks';
+import { ChecklistItem } from '@/components/(administracion)/planificador/lib/zod';
 
 interface Props {
   planificadorId: string;

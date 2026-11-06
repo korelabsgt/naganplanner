@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Save, Sparkles, Loader2, Trash2, Layers, Tag, Users, UserPlus, ClipboardList, Dices, Building2, Briefcase, Plus, ChevronDown, Copy, Edit2, Calendar } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { usePlanificadorMutations, useGestorEquipos } from '../lib/hooks';
-import { PlanificadorForm, planificadorFormSchema, Perfil, Planificador, ChecklistItem, VideoAdjunto } from '../lib/zod';
+import { usePlanificadorMutations, useGestorEquipos } from '@/components/(administracion)/planificador/lib/hooks';
+import { PlanificadorForm, planificadorFormSchema, Perfil, Planificador, ChecklistItem, VideoAdjunto } from '@/components/(administracion)/planificador/lib/zod';
 
 // Componentes de sección
 import { SeccionGeneral } from './SeccionGeneral';

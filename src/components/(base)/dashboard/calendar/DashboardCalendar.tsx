@@ -133,17 +133,26 @@ export function DashboardCalendar({
     return map;
   }, [filteredEvents]);
 
-  // Métricas del mes actual
+  // Métricas del mes actual (agrupa servicios con mismo nombre, fecha y hora como 1 solo)
   const monthStats = useMemo(() => {
-    let actividades = 0;
-    let servicios = 0;
+    const uniqueServicios = new Set<string>();
+    const uniqueActividades = new Set<string>();
+
     filteredEvents.forEach((ev) => {
       const [evY, evM] = ev.date.split("-").map(Number);
       if (evY === year && evM === month + 1) {
-        if (ev.type === "servicio") servicios++;
-        else actividades++;
+        const cleanTitle = (ev.title || "").trim().toLowerCase();
+        const timeStr = (ev.time || "").trim();
+        if (ev.type === "servicio") {
+          uniqueServicios.add(`servicio_${cleanTitle}_${ev.date}_${timeStr}`);
+        } else {
+          uniqueActividades.add(`actividad_${cleanTitle}_${ev.date}_${timeStr || ev.id}`);
+        }
       }
     });
+
+    const servicios = uniqueServicios.size;
+    const actividades = uniqueActividades.size;
     return { actividades, servicios, total: actividades + servicios };
   }, [filteredEvents, year, month]);
 
@@ -156,12 +165,27 @@ export function DashboardCalendar({
     const totalDays = lastDay.getDate();
     const daysPrevMonth = new Date(year, month, 0).getDate();
 
+    const countUniqueEvents = (events: CalendarEvent[]) => {
+      const uniqueKeys = new Set<string>();
+      events.forEach((ev) => {
+        const cleanTitle = (ev.title || "").trim().toLowerCase();
+        const timeStr = (ev.time || "").trim();
+        if (ev.type === "servicio") {
+          uniqueKeys.add(`servicio_${cleanTitle}_${ev.date}_${timeStr}`);
+        } else {
+          uniqueKeys.add(`otro_${cleanTitle}_${ev.date}_${timeStr || ev.id}`);
+        }
+      });
+      return uniqueKeys.size;
+    };
+
     const cells: Array<{
       dateString: string;
       dayNumber: number;
       isCurrentMonth: boolean;
       isToday: boolean;
       events: CalendarEvent[];
+      eventCount: number;
     }> = [];
 
     // Días del mes anterior
@@ -175,6 +199,7 @@ export function DashboardCalendar({
         isCurrentMonth: false,
         isToday: false,
         events: eventsByDate.get(str) || [],
+        eventCount: countUniqueEvents(eventsByDate.get(str) || []),
       });
     }
 
@@ -187,6 +212,7 @@ export function DashboardCalendar({
         isCurrentMonth: true,
         isToday: str === todayStr,
         events: eventsByDate.get(str) || [],
+        eventCount: countUniqueEvents(eventsByDate.get(str) || []),
       });
     }
 
@@ -204,6 +230,7 @@ export function DashboardCalendar({
         isCurrentMonth: false,
         isToday: false,
         events: eventsByDate.get(str) || [],
+        eventCount: countUniqueEvents(eventsByDate.get(str) || []),
       });
     }
 
@@ -371,7 +398,7 @@ export function DashboardCalendar({
                   {hasEvents && (
                     <div className="w-full mt-1 flex items-center gap-1 group-hover:scale-105 transition-transform">
                       <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                        {cell.events.length}
+                        {cell.eventCount}
                       </span>
                       <div className="h-1.5 sm:h-2 flex-1 rounded-full bg-amber-500" />
                     </div>

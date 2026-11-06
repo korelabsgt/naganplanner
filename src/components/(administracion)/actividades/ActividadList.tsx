@@ -117,29 +117,84 @@ export default function ActividadList({ initialData, tipoVista }: Props) {
   }, [actividades, canViewAll, filtroVista, perfil.id]);
 
   const eventosPorFecha = useMemo(() => {
-    const map = new Map<string, number>();
+    const dateKeysMap = new Map<string, Set<string>>();
     actividadesBase.forEach((a) => {
       if (!a.due_date) return;
       const d = new Date(a.due_date);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${day}`;
-      map.set(dateStr, (map.get(dateStr) || 0) + 1);
+      const dateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+      const timeStr = typeof a.due_date === 'string' && a.due_date.includes('T')
+        ? new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Guatemala',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }).format(d)
+        : '';
+
+      const s = (a.status || "").toLowerCase().trim();
+      const isServicio = ['servicio', 'culto', 'ensayo', 'servicio_especial', 'especial'].includes(s);
+      const cleanTitle = (a.title || '').trim().toLowerCase();
+
+      const uniqueKey = isServicio
+        ? `servicio_${cleanTitle}_${dateStr}_${timeStr}`
+        : `otro_${cleanTitle}_${dateStr}_${timeStr || a.id}`;
+
+      if (!dateKeysMap.has(dateStr)) {
+        dateKeysMap.set(dateStr, new Set());
+      }
+      dateKeysMap.get(dateStr)!.add(uniqueKey);
+    });
+
+    const map = new Map<string, number>();
+    dateKeysMap.forEach((keys, date) => {
+      map.set(date, keys.size);
     });
     return map;
   }, [actividadesBase]);
 
   const stats = useMemo(() => {
-    let count = 0;
+    const uniqueServicios = new Set<string>();
+    const uniqueActividades = new Set<string>();
+
     actividadesBase.forEach(a => {
       if (!a.due_date) return;
       const d = new Date(a.due_date);
-      if (d.getMonth() === mesSeleccionado && d.getFullYear() === anioSeleccionado) {
-        count++;
+      const dateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+      const [evY, evM] = dateStr.split('-').map(Number);
+      if (evM - 1 === mesSeleccionado && evY === anioSeleccionado) {
+        const timeStr = typeof a.due_date === 'string' && a.due_date.includes('T')
+          ? new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Guatemala',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }).format(d)
+          : '';
+
+        const s = (a.status || "").toLowerCase().trim();
+        const cleanTitle = (a.title || '').trim().toLowerCase();
+
+        if (['servicio', 'culto', 'ensayo', 'servicio_especial', 'especial'].includes(s)) {
+          uniqueServicios.add(`servicio_${cleanTitle}_${dateStr}_${timeStr}`);
+        } else {
+          uniqueActividades.add(`actividad_${cleanTitle}_${dateStr}_${timeStr || a.id}`);
+        }
       }
     });
-    return { actividades: count, servicios: 0 };
+
+    return { actividades: uniqueActividades.size, servicios: uniqueServicios.size };
   }, [actividadesBase, mesSeleccionado, anioSeleccionado]);
 
   const searchParams = useSearchParams();

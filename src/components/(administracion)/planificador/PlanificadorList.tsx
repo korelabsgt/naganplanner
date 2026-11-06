@@ -210,35 +210,88 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
   }, [mesSeleccionado, anioSeleccionado, planificadoresBase, filtroEstado]);
 
   const eventosPorFecha = useMemo(() => {
-    const map = new Map<string, number>();
+    // Agrupa actividades del mismo servicio (mismo nombre, fecha y hora) como 1 solo para el conteo de la celda
+    const dateKeysMap = new Map<string, Set<string>>();
     planificadoresBase.forEach((p) => {
       if (!p.due_date) return;
       const d = new Date(p.due_date);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${day}`;
-      map.set(dateStr, (map.get(dateStr) || 0) + 1);
+      const dateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+      const timeStr = typeof p.due_date === 'string' && p.due_date.includes('T')
+        ? new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Guatemala',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }).format(d)
+        : '';
+
+      const s = (p.status || "").toLowerCase().trim();
+      const isServicio = ['servicio', 'culto', 'ensayo', 'servicio_especial', 'especial'].includes(s);
+      const cleanTitle = (p.title || '').trim().toLowerCase();
+
+      // Si es servicio y coinciden nombre, fecha y hora, comparten la misma clave (cuenta como 1)
+      const uniqueKey = isServicio
+        ? `servicio_${cleanTitle}_${dateStr}_${timeStr}`
+        : `otro_${cleanTitle}_${dateStr}_${timeStr || p.id}`;
+
+      if (!dateKeysMap.has(dateStr)) {
+        dateKeysMap.set(dateStr, new Set());
+      }
+      dateKeysMap.get(dateStr)!.add(uniqueKey);
+    });
+
+    const map = new Map<string, number>();
+    dateKeysMap.forEach((keys, date) => {
+      map.set(date, keys.size);
     });
     return map;
   }, [planificadoresBase]);
 
   const calendarStats = useMemo(() => {
-    let servicios = 0;
-    let reuniones = 0;
+    // Si en un día hay varias actividades que coinciden con el mismo nombre, fecha y hora de servicio,
+    // se cuenta como 1 solo servicio en las métricas
+    const uniqueServicios = new Set<string>();
+    const uniqueReuniones = new Set<string>();
+
     planificadoresBase.forEach(p => {
       if (!p.due_date) return;
       const d = new Date(p.due_date);
-      if (d.getMonth() === mesSeleccionado && d.getFullYear() === anioSeleccionado) {
-        const s = (p.status || "").toLowerCase();
+      const dateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+      const [evY, evM] = dateStr.split('-').map(Number);
+      if (evM - 1 === mesSeleccionado && evY === anioSeleccionado) {
+        const timeStr = typeof p.due_date === 'string' && p.due_date.includes('T')
+          ? new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Guatemala',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }).format(d)
+          : '';
+
+        const s = (p.status || "").toLowerCase().trim();
+        const cleanTitle = (p.title || '').trim().toLowerCase();
+
         if (['servicio', 'culto', 'ensayo', 'servicio_especial', 'especial'].includes(s)) {
-          servicios++;
+          uniqueServicios.add(`servicio_${cleanTitle}_${dateStr}_${timeStr}`);
         } else {
-          reuniones++;
+          uniqueReuniones.add(`reunion_${cleanTitle}_${dateStr}_${timeStr || p.id}`);
         }
       }
     });
-    return { servicios, reuniones };
+
+    return { servicios: uniqueServicios.size, reuniones: uniqueReuniones.size };
   }, [planificadoresBase, mesSeleccionado, anioSeleccionado]);
 
   useEffect(() => {

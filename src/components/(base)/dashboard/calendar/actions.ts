@@ -74,21 +74,28 @@ export async function obtenerActividadesCalendario(): Promise<{
         }
       }
 
-      // Extraer año, mes y día
+      // Extraer año, mes, día y hora siempre en la zona horaria oficial (America/Guatemala UTC-6)
+      // para evitar desfases de horario entre servidor local y servidores en la nube (ej. Vercel en UTC)
       const d = new Date(act.due_date);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const dateStr = `${y}-${m}-${day}`;
-
-      // Extraer hora formateada si existe en el timestamp
+      let dateStr = "";
       let timeStr: string | undefined = undefined;
-      if (typeof act.due_date === "string" && act.due_date.includes("T")) {
-        const hours = d.getHours();
-        const minutes = String(d.getMinutes()).padStart(2, "0");
-        const ampm = hours >= 12 ? "PM" : "AM";
-        const formattedHours = hours % 12 || 12;
-        timeStr = `${String(formattedHours).padStart(2, "0")}:${minutes} ${ampm}`;
+
+      if (typeof act.due_date === "string" && !act.due_date.includes("T")) {
+        dateStr = act.due_date.slice(0, 10);
+      } else {
+        dateStr = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Guatemala",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(d);
+
+        timeStr = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Guatemala",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }).format(d);
       }
 
       // Nombre de categoría visible en el badge (priorizar el tipo real: Servicio, Ensayo, etc.)

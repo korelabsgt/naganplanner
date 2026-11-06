@@ -337,7 +337,10 @@ export function DashboardCalendar({
                   key={`${cell.dateString}-${idx}`}
                   whileTap={{ scale: 0.93 }}
                   onClick={() => handleDayClick(cell.dateString)}
-                  className={`min-h-[48px] sm:min-h-[66px] p-0.5 sm:p-1.5 flex flex-col justify-between items-center sm:items-start text-left border-b border-r border-[#d5cec2]/60 dark:border-border/20 transition-all group relative cursor-pointer ${
+                  style={{
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                  className={`min-h-[48px] sm:min-h-[66px] p-0.5 sm:p-1.5 flex flex-col justify-between items-center sm:items-start text-left border-b border-r border-[#d5cec2]/60 dark:border-border/20 transition-all group relative cursor-pointer touch-manipulation select-none ${
                     idx % 7 === 6 ? "border-r-0" : ""
                   } ${
                     cell.isCurrentMonth
@@ -379,21 +382,26 @@ export function DashboardCalendar({
           </div>
         </div>
 
-        {/* POPOVER SUPERPUESTO (Efecto burbuja elástica estilo macOS) */}
+        {/* POPOVER SUPERPUESTO (Efecto burbuja elástica optimizado para iOS WebKit sin parpadeo) */}
         <AnimatePresence>
           {isPopoverOpen && selectedDate && (
             <>
-              {/* Overlay oscuro para cerrar al pulsar fuera */}
+              {/* Overlay oscuro para cerrar al pulsar fuera (sin backdrop-blur animado ni transition-opacity para eliminar parpadeo en iPhone) */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="absolute inset-0 bg-black/60 backdrop-blur-[3px] rounded-2xl z-20 transition-opacity"
+                style={{
+                  WebkitBackfaceVisibility: "hidden",
+                  backfaceVisibility: "hidden",
+                  willChange: "opacity",
+                }}
+                className="absolute inset-0 bg-black/75 rounded-2xl z-20"
                 onClick={() => setIsPopoverOpen(false)}
               />
 
-              {/* Tarjeta flotante superpuesta estilo burbuja macOS */}
+              {/* Tarjeta flotante superpuesta con aceleración GPU estabilizada para iOS */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.72, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -409,7 +417,13 @@ export function DashboardCalendar({
                   damping: 25,
                   mass: 0.8,
                 }}
-                className="absolute inset-x-0.5 sm:inset-x-4 top-1 sm:top-3 z-30 bg-white dark:bg-[#12141a]/96 backdrop-blur-2xl border border-[#d5cec2] dark:border-white/10 rounded-2xl sm:rounded-3xl px-1.5 py-2.5 sm:p-5 shadow-2xl flex flex-col gap-2.5 sm:gap-3 ring-1 ring-black/5 dark:ring-white/5"
+                style={{
+                  WebkitBackfaceVisibility: "hidden",
+                  backfaceVisibility: "hidden",
+                  transform: "translate3d(0, 0, 0)",
+                  willChange: "transform, opacity",
+                }}
+                className="absolute inset-x-0.5 sm:inset-x-4 top-1 sm:top-3 z-30 bg-white dark:bg-[#12141a] border border-[#d5cec2] dark:border-white/10 rounded-2xl sm:rounded-3xl px-1.5 py-2.5 sm:p-5 shadow-2xl flex flex-col gap-2.5 sm:gap-3 ring-1 ring-black/5 dark:ring-white/5"
               >
                 {/* Cabecera del popover con fecha formateada en azul y botón cerrar */}
                 <div className="flex items-center justify-between px-1 pb-2 border-b border-[#d5cec2]/60 dark:border-border/30">

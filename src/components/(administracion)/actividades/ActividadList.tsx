@@ -35,6 +35,16 @@ const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+const getGuatemalaDateString = (dateInput: Date | string): string => {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+};
+
 export default function ActividadList({ initialData, tipoVista }: Props) {
   const { data } = useGestorActividades(tipoVista, initialData);
   
@@ -47,8 +57,14 @@ export default function ActividadList({ initialData, tipoVista }: Props) {
   // --- ESTADOS ---
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
-  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth());
-  const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => {
+    const [, m] = getGuatemalaDateString(new Date()).split('-').map(Number);
+    return m - 1;
+  });
+  const [anioSeleccionado, setAnioSeleccionado] = useState(() => {
+    const [y] = getGuatemalaDateString(new Date()).split('-').map(Number);
+    return y;
+  });
   
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);

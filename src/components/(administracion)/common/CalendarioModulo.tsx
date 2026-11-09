@@ -45,8 +45,14 @@ export default function CalendarioModulo({
   onFiltroVistaChange,
   stats,
 }: CalendarioModuloProps) {
-  const hoy = new Date();
-  const todayStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+  const todayStr = useMemo(() => {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Guatemala',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  }, []);
 
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [pickerAnio, setPickerAnio] = useState(anio);
@@ -62,7 +68,8 @@ export default function CalendarioModulo({
   };
 
   const goToToday = () => {
-    onMesChange(hoy.getMonth(), hoy.getFullYear());
+    const [y, m] = todayStr.split('-').map(Number);
+    onMesChange(m - 1, y);
     onDiaSelect(todayStr);
   };
 

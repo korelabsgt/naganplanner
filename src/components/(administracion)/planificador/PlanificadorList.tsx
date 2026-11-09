@@ -50,17 +50,24 @@ const TIPOS_SERVICIO = [
   { value: 'servicio_especial', label: 'Servicio Especial' },
 ];
 
+const getGuatemalaDateString = (dateInput: Date | string): string => {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+};
+
 const getEstadoCalculado = (fechaISO: string | null | undefined) => {
   if (!fechaISO) return 'Sin fecha';
 
-  const ahora = new Date();
-  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const hoyStr = getGuatemalaDateString(new Date());
+  const fechaStr = getGuatemalaDateString(fechaISO);
 
-  const fecha = new Date(fechaISO);
-  const fechaSoloDia = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
-
-  if (fechaSoloDia.getTime() === hoy.getTime()) return 'Para hoy';
-  if (fechaSoloDia.getTime() < hoy.getTime()) return 'Terminados';
+  if (fechaStr === hoyStr) return 'Para hoy';
+  if (fechaStr < hoyStr) return 'Terminados';
   return 'Próximos';
 };
 
@@ -87,8 +94,14 @@ export default function PlanificadorList({ initialData, tipoVista, modulo }: Pro
     return '';
   });
 
-  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth());
-  const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => {
+    const [, m] = getGuatemalaDateString(new Date()).split('-').map(Number);
+    return m - 1;
+  });
+  const [anioSeleccionado, setAnioSeleccionado] = useState(() => {
+    const [y] = getGuatemalaDateString(new Date()).split('-').map(Number);
+    return y;
+  });
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);

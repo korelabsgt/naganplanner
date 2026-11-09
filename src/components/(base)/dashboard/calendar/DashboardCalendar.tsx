@@ -66,6 +66,17 @@ function getEventUrl(ev: CalendarEvent, isUserAdmin: boolean = false): string {
 
 const ITEMS_PER_PAGE = 3;
 
+function getGuatemalaNow(): { dateStr: string; year: number; month: number } {
+  const str = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const [y, m] = str.split('-').map(Number);
+  return { dateStr: str, year: y, month: m - 1 };
+}
+
 export function DashboardCalendar({
   initialEvents = [],
   canViewAll: canViewAllProp = false,
@@ -76,16 +87,12 @@ export function DashboardCalendar({
   const isClientAdmin = ["admin", "super"].includes(clientRole);
   const canViewAll = canViewAllProp || isClientAdmin;
 
-  const hoy = useMemo(() => new Date(), []);
-  const todayStr = useMemo(
-    () =>
-      `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
-        hoy.getDate()
-      ).padStart(2, "0")}`,
-    [hoy]
-  );
+  const guatNow = useMemo(() => getGuatemalaNow(), []);
+  const todayStr = guatNow.dateStr;
 
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(
+    () => new Date(guatNow.year, guatNow.month, 1)
+  );
   // Si puede ver todo (admin/super), arranca en TODAS; si no, forzado a MÍAS
   const [filterType, setFilterType] = useState<"TODAS" | "MÍAS">(
     canViewAll ? "TODAS" : "MÍAS"
@@ -108,8 +115,9 @@ export function DashboardCalendar({
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date());
-    setSelectedDate(todayStr);
+    const fresh = getGuatemalaNow();
+    setCurrentDate(new Date(fresh.year, fresh.month, 1));
+    setSelectedDate(fresh.dateStr);
     setCurrentPage(1);
     setIsPopoverOpen(true);
   };

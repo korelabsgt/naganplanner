@@ -34,7 +34,7 @@ const configProgramaBaseSchema = z.object({
   plantilla_id: z.string().uuid().nullable().optional(),
   parent_id: z.string().uuid().nullable().optional(),
   orden: z.number(),
-  tipo_elemento: z.enum(['agrupador', 'rol', 'dependencia']),
+  tipo_elemento: z.enum(['agrupador', 'rol', 'dependencia', 'general']),
   nombre_mostrar: z.string(),
   tiempo_minutos: z.number().nullable().optional(),
   created_at: z.string(),
@@ -56,7 +56,7 @@ export const configProgramaFormSchema = z.object({
   plantilla_id: z.string().uuid().nullable().optional(),
   parent_id: z.string().uuid().nullable().optional(),
   orden: z.number().int().min(1, "El orden debe ser mayor a 0"),
-  tipo_elemento: z.enum(['agrupador', 'rol', 'dependencia']),
+  tipo_elemento: z.enum(['agrupador', 'rol', 'dependencia', 'general']),
   nombre_mostrar: z.string().min(1, "El nombre es requerido"),
   tiempo_minutos: z.number().int().min(0).nullable().optional(),
 });
@@ -75,7 +75,7 @@ export const reporteItemSchema: z.ZodType<ReporteItem> = z.lazy(() =>
   z.object({
     numero: z.string(),          // "1", "2", "3.1", "3.2", etc.
     nombre: z.string(),
-    tipo: z.enum(['agrupador', 'rol', 'dependencia']),
+    tipo: z.enum(['agrupador', 'rol', 'dependencia', 'general']),
     integrantes: z.array(integranteReporteSchema),
     tiempo_minutos: z.number(),  // Para agrupadores: suma de hijos. Para otros: propio.
     hora_inicio: z.string().optional(),
@@ -93,7 +93,7 @@ export interface ConfigProgramaServicio {
   plantilla_id?: string | null;
   parent_id?: string | null;
   orden: number;
-  tipo_elemento: 'agrupador' | 'rol' | 'dependencia';
+  tipo_elemento: 'agrupador' | 'rol' | 'dependencia' | 'general';
   referencia_busqueda?: string | null;
   nombre_mostrar: string;
   tiempo_minutos?: number | null;
@@ -111,7 +111,7 @@ export interface IntegranteReporte {
 export interface ReporteItem {
   numero: string;
   nombre: string;
-  tipo: 'agrupador' | 'rol' | 'dependencia';
+  tipo: 'agrupador' | 'rol' | 'dependencia' | 'general';
   integrantes: IntegranteReporte[];
   tiempo_minutos: number;
   hora_inicio?: string;

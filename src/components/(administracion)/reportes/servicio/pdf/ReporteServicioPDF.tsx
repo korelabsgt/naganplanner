@@ -126,10 +126,12 @@ const styles = StyleSheet.create({
   badgeNumAgrupador: { backgroundColor: '#F8AC32' },
   badgeNumHijo: { backgroundColor: '#d1fae5' },
   badgeNumSubhijo: { backgroundColor: '#dbeafe' },
+  badgeNumGeneral: { backgroundColor: '#f3e8ff' },
   textNumBase: { fontSize: 8, fontWeight: 'bold' },
   textNumAgrupador: { color: 'white' },
   textNumHijo: { color: '#047857' },
   textNumSubhijo: { color: '#1d4ed8' },
+  textNumGeneral: { color: '#7e22ce' },
   cellText: {
     fontSize: 9,
     color: '#374151',
@@ -201,14 +203,19 @@ interface Props {
 const renderFilas = (items: ReporteItem[], nivel = 0): React.ReactNode[] => {
   return items.flatMap((item) => {
     const esAgrupador = item.tipo === 'agrupador';
+    const esGeneral = item.tipo === 'general';
     
     // Logic for number badge colors
     const numBadgeStyle = esAgrupador 
       ? styles.badgeNumAgrupador 
-      : nivel > 0 ? styles.badgeNumHijo : styles.badgeNumSubhijo;
+      : esGeneral
+        ? styles.badgeNumGeneral
+        : nivel > 0 ? styles.badgeNumHijo : styles.badgeNumSubhijo;
     const numTextStyle = esAgrupador 
       ? styles.textNumAgrupador 
-      : nivel > 0 ? styles.textNumHijo : styles.textNumSubhijo;
+      : esGeneral
+        ? styles.textNumGeneral
+        : nivel > 0 ? styles.textNumHijo : styles.textNumSubhijo;
 
     const fila = (
       <View key={item.numero} style={[styles.tableRow, ...(esAgrupador ? [styles.tableRowAgrupador] : [])]} wrap={false}>
@@ -224,7 +231,9 @@ const renderFilas = (items: ReporteItem[], nivel = 0): React.ReactNode[] => {
         </View>
         <View style={[styles.colResp, { paddingVertical: 4, paddingHorizontal: 6 }]}>
           {!esAgrupador && (
-            item.integrantes?.length > 0 ? (
+            esGeneral ? (
+              <Text style={{ fontSize: 9, color: '#d1d5db' }}>-</Text>
+            ) : item.integrantes?.length > 0 ? (
               <View style={{ flexDirection: 'column' }}>
                 {item.integrantes.map((i: IntegranteReporte, idx: number) => (
                   <View key={idx} style={styles.badgeResp}>

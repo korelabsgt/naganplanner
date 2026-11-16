@@ -10,6 +10,7 @@ interface Props {
 
 export default function ServicioItem({ item, isSubItem = false }: Props) {
   const esAgrupador = item.tipo === 'agrupador';
+  const esGeneral = item.tipo === 'general';
   const tieneHijos = item.hijos && item.hijos.length > 0;
   const esRol = item.tipo === 'rol';
 
@@ -34,9 +35,11 @@ export default function ServicioItem({ item, isSubItem = false }: Props) {
               flex-shrink-0 w-8 h-8 mt-0.5 sm:mt-0 rounded-xl flex items-center justify-center text-xs font-bold tracking-tight
               ${esAgrupador
                 ? 'bg-[#F8AC32] text-white shadow-sm shadow-[#F8AC32]/30'
-                : esRol
-                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                  : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                : esGeneral
+                  ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                  : esRol
+                    ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                    : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
               }
             `}
           >
@@ -60,7 +63,7 @@ export default function ServicioItem({ item, isSubItem = false }: Props) {
             </div>
 
             {/* Responsables — debajo del nombre para todos los tamaños */}
-            {!esAgrupador && (
+            {!esAgrupador && !esGeneral && (
               <div className="mt-1 flex flex-col gap-1">
                 {item.integrantes.length > 0 ? (
                   item.integrantes.map((p: IntegranteReporte, i: number) => (

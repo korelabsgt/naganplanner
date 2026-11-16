@@ -42,6 +42,7 @@ function formatearHora(isoString: string): string {
 
 function FilaItem({ item, nivel = 0 }: { item: ReporteItem; nivel?: number }) {
   const esAgrupador = item.tipo === 'agrupador';
+  const esGeneral = item.tipo === 'general';
   const tieneHijos = item.hijos && item.hijos.length > 0;
 
   return (
@@ -64,9 +65,11 @@ function FilaItem({ item, nivel = 0 }: { item: ReporteItem; nivel?: number }) {
               inline-flex items-center justify-center w-6 h-6 rounded-lg text-[11px] font-bold
               ${esAgrupador
                 ? 'bg-[#F8AC32] text-white'
-                : nivel > 0
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-blue-100 text-blue-700'
+                : esGeneral
+                  ? 'bg-purple-100 text-purple-700'
+                  : nivel > 0
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-blue-100 text-blue-700'
               }
             `}
           >
@@ -92,7 +95,9 @@ function FilaItem({ item, nivel = 0 }: { item: ReporteItem; nivel?: number }) {
         {/* Responsable(s) */}
         <td className="px-4 py-3 align-middle">
           {!esAgrupador && (
-            item.integrantes.length > 0 ? (
+            esGeneral ? (
+              <span className="text-[11px] text-gray-300">-</span>
+            ) : item.integrantes.length > 0 ? (
               <div className="flex flex-col gap-1 items-start">
                 {item.integrantes.map((p, i) => (
                   <span

@@ -28,6 +28,7 @@ const TIPO_OPCIONES = [
   { value: 'agrupador', label: 'Agrupador (Título con subpuntos)', color: '#F8AC32' },
   { value: 'rol', label: 'Rol (persona por rol)', color: 'blue' },
   { value: 'dependencia', label: 'Dependencia (módulo/departamento)', color: 'emerald' },
+  { value: 'general', label: 'Punto General (receso, transición, etc.)', color: 'purple' },
 ] as const;
 const FORM_VACIO: ConfigProgramaForm = {
   parent_id: null,
@@ -569,7 +570,9 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                           ? 'bg-[#F8AC32]/20 dark:bg-[#F8AC32]/20 text-[#E09827] dark:text-[#F8AC32]/60'
                           : item.tipo_elemento === 'rol'
                             ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                            : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                            : item.tipo_elemento === 'general'
+                              ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                              : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
                         }
                       `}
                     >
@@ -583,7 +586,9 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
                         {item.tipo_elemento === 'agrupador'
                           ? 'Agrupador (Contenedor)'
-                          : `${item.tipo_elemento === 'rol' ? 'Rol' : 'Dependencia'} · ${item.tiempo_minutos ?? 0} min`}
+                          : item.tipo_elemento === 'general'
+                            ? `Punto General · ${item.tiempo_minutos ?? 0} min`
+                            : `${item.tipo_elemento === 'rol' ? 'Rol' : 'Dependencia'} · ${item.tiempo_minutos ?? 0} min`}
                       </p>
                     </div>
                     {/* Acciones */}
@@ -639,6 +644,16 @@ export default function VistaConfigurarPrograma({ onBack, initialConfig, initial
                       value={form.nombre_mostrar}
                       onChange={(e) => setForm({ ...form, nombre_mostrar: e.target.value })}
                       placeholder="Ej: Coordinación / Bienvenida"
+                      required
+                      className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F8AC32] transition-all"
+                    />
+                  )}
+                  {form.tipo_elemento === 'general' && (
+                    <input
+                      type="text"
+                      value={form.nombre_mostrar}
+                      onChange={(e) => setForm({ ...form, nombre_mostrar: e.target.value })}
+                      placeholder="Ej: Receso, Refrigerio, Transición..."
                       required
                       className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F8AC32] transition-all"
                     />
